@@ -21,6 +21,7 @@ A patch for **NX Redux (NextUI) on the TrimUI Brick Pro** that translates the in
 - **Boot logo** `Big Mr712.bmp` with a signature; the clean variant `Big` stays available in `Settings → Boot logo`.
 - **Dedicated patcher menu** with a description of the selected item, black "Install / Remove / Exit" screens and wrap-around navigation.
 - **Grid wrap-around**: in Tools, Consoles and Collections, pressing down on the last row moves to the first one, and up on the first row moves to the last one.
+- **Search within the console**: a game-menu item that matches the **beginning of the game title** in the current console folder (the file extension is ignored). Results are shown as a normal game list.
 - **Version check**: if `version.txt` is not `NXRedux-v2.5.1`, the patch warns and offers to cancel (cancel is the default).
 
 ## Compatibility
@@ -29,7 +30,7 @@ A patch for **NX Redux (NextUI) on the TrimUI Brick Pro** that translates the in
 - Firmware: **NX Redux 2.5.1** (checked through `version.txt`).
 - The patch works with the **installed** binaries: nothing is downgraded, official updates keep working.
 - Official `nextui.elf` and `settings.elf` are not part of this repository — the patch is applied to the files already present on the card.
-- The translation is version independent: strings are located by content. Code changes (grid wrap) are build specific and are simply skipped on another version.
+- The translation is version independent: strings are located by content. Code changes (grid wrap, console search) are build specific and are simply skipped on another version.
 
 ## Installation
 
