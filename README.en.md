@@ -42,6 +42,8 @@ A patch for **NX Redux (NextUI) on the TrimUI Brick Pro** that translates the in
    ```
    The folder name may be anything (`Ports`, `PORTS`, etc.): the scripts derive their path from their own file instead of a hard-coded `Ports (PORTS)`. The folder still has to be a console NextUI lists (normally `Ports (PORTS)`), with the `.sh` next to `.ports/nxredux-mr712/`.
 2. Insert the card into the console and power it on.
+
+> To build a ready-to-copy archive, run `build.bat` in the project root: it writes `builds/NXPatch_v1.0_for_Trimui_Brick_Pro.zip`. Unpack it into the card root — it already contains `Roms/Ports (PORTS)/…`.
 3. Open **Ports** and start **NX REDUX Mr712 Patch** (or `TOOLS → NX REDUX Mr712 Patch`).
 4. Choose **Install patch** and confirm.
 5. Wait for the "Done" message and reboot the console.

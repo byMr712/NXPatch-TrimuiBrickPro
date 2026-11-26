@@ -5,3 +5,6 @@ bootlogo_before.bmp
 Mr712_patch.log
 Thumbs.db
 desktop.ini
+
+# build output
+builds/
