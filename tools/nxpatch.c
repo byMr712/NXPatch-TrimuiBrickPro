@@ -165,9 +165,9 @@ static size_t grid_up_off, grid_down_off;
  * Все адреса — из nextui.elf 2.5.1, применение защищено проверкой сигнатур. */
 static size_t cb_off;
 static size_t cs_label_off, cs_prompt_off, cs_roms_off, cs_tmpdir_off, cs_title_off;
-static size_t cs_back_off;
+static size_t cs_back_off, cs_cont_prefix_off, cs_fmt_ss_off;
 static uint64_t cs_stub_item_va, cs_stub_item2_va, cs_stub_act_va;
-static uint64_t cs_leave_hook_va, cs_hint_hook_va;
+static uint64_t cs_leave_hook_va, cs_hint_hook_va, cs_handle_hook_va, cs_open_hook_va;
 static int cs_built, cs_patched;
 
 #define A_CTX_ADD     0x41c7b0ULL  /* addItem(items, &count, label, id) */
@@ -182,10 +182,13 @@ static int cs_built, cs_patched;
 #define A_ENTRY_NEW_NAMED 0x4adac0ULL /* Entry_newNamed(path,type,name) */
 #define A_ARRAY_NEW    0x4ad150ULL /* Array_new() */
 #define A_ENTRYARRAY_FREE 0x4acd00ULL /* EntryArray_free(arr) */
+#define A_RECENTS_AT  0x4acc20ULL  /* Recents_at(i) */
+#define A_RECENT_ENTRY 0x4adc40ULL /* Recents_entryFromRecent(recent) */
 #define P_SNPRINTF    0x406710ULL
 #define P_FREE        0x407350ULL
 #define P_STRLEN      0x4074c0ULL
 #define P_STRNCMP     0x406b30ULL
+#define P_STRCMP      0x407170ULL
 #define P_GETENV      0x407220ULL
 #define P_SETENV      0x406640ULL
 #define P_STRDUP      0x407200ULL
@@ -198,6 +201,7 @@ static int cs_built, cs_patched;
 #define G_STACK       0x4d8e80ULL  /* Array* stack */
 #define G_BGREUPLOAD  0x510428ULL
 #define G_SEARCHQ     0x510430ULL  /* char search_query[256] */
+#define G_RESUME      0x50e1d8ULL  /* ResumeState resume */
 #define G_PAD         0x50e0d0ULL
 #define L_FAUXSEARCH  0x4ae930ULL  /* FAUX_SEARCH_PATH */
 #define L_FMT_S       0x4b5588ULL  /* "%s" */
@@ -244,9 +248,13 @@ static void e_ldsw(int rt, int rn, uint32_t off) {
 static void e_ldrb(int rt, int rn, uint32_t off) {
     cb32(0x39400000u | (off << 10) | ((uint32_t)rn << 5) | (uint32_t)rt);
 }
+static void e_strb(int rt, int rn, uint32_t off) {
+    cb32(0x39000000u | (off << 10) | ((uint32_t)rn << 5) | (uint32_t)rt);
+}
 static void e_cmp_i(int rn, uint32_t imm) { cb32(0x71000000u | ((imm & 0xFFF) << 10) | ((uint32_t)rn << 5) | 31u); }
 static void e_cmp_r(int rn, int rm) { cb32(0x6B000000u | ((uint32_t)rm << 16) | ((uint32_t)rn << 5) | 31u); }
 static void e_add_w(int rd, int rn, uint32_t imm) { cb32(0x11000000u | ((imm & 0xFFF) << 10) | ((uint32_t)rn << 5) | (uint32_t)rd); }
+static void e_subi(int rd, int rn, uint32_t imm) { cb32(0xD1000000u | ((imm & 0xFFF) << 10) | ((uint32_t)rn << 5) | (uint32_t)rd); }
 static void e_stp_pre(int rt, int rt2, int rn, int imm7) {
     cb32(0xA9800000u | ((uint32_t)(imm7 & 0x7F) << 15) | ((uint32_t)rt2 << 10) | ((uint32_t)rn << 5) | (uint32_t)rt);
 }
@@ -350,6 +358,8 @@ static int build_console_search(void) {
     uint64_t s_tmpdir = cs_str(&cs_tmpdir_off, "/tmp/.nxsearch");
     uint64_t s_title = cs_str(&cs_title_off, "Поиск: %s");
     uint64_t s_back = cs_str(&cs_back_off, "НАЗАД В ПОИСК");
+    uint64_t s_cont_prefix = cs_str(&cs_cont_prefix_off, "» ");
+    uint64_t s_fmt_ss = cs_str(&cs_fmt_ss_off, "%s%s");
     while (cb_off % 8) cave[cb_off++] = 0;
 
     /* ==================== заполнение результатов ====================
@@ -379,6 +389,9 @@ static int build_console_search(void) {
     size_t f_n0 = cb_off; cb32(0);       /* cbz x28 -> f_next */
     e_ldr_x(0, 28, 8);                   /* e->name */
     size_t f_n1 = cb_off; cb32(0);       /* cbz x0 -> f_next */
+    e_ldr_w(4, 28, 0x1c);                /* alpha */
+    e_add_w(4, 4, 1);
+    size_t f_alpha = cb_off; cb32(0);    /* cbz w4 -> f_next (наш пункт) */
     e_adrp(1, G_SEARCHQ); e_addi(1, 1, (uint32_t)(G_SEARCHQ & 0xFFF));
     e_mov(2, 22);
     e_bl(P_STRNCASECMP);
@@ -465,6 +478,7 @@ static int build_console_search(void) {
     fix_bcond_cave(f_ge, 0xA, f_done);
     fix_cbz64_cave(f_n0, f_next, 28);
     fix_cbz64_cave(f_n1, f_next, 0);
+    fix_cbz_cave(f_alpha, f_next, 4);
     {   int64_t d = (int64_t)f_next - (int64_t)(cave_vaddr + f_nz);
         wr32(cave + f_nz, 0x35000000u | (((uint32_t)((d >> 2) & 0x7FFFF)) << 5) | 0u); }
     fix_cbz64_cave(f_nc, f_next, 0);
@@ -681,6 +695,209 @@ static int build_console_search(void) {
     fix_bcond_cave(h_hi, 0x8 /*HI*/, h_pass);
     fix_cbz_cave(h_no, h_pass, 0);
 
+    /* ==================== «Продолжить» в начале списка консоли ====================
+     * Если top — папка под Roms и в recents есть игра из неё, вставляем
+     * синтетическую запись: name — реальное имя, unique — «ПРОДОЛЖИТЬ: имя».
+     * alpha = -1 помечает её; A на ней запускает с сейва. */
+    uint64_t cont_va = cave_vaddr + cb_off;
+    e_stp_pre(19, 20, 31, -44);          /* 0x160, буфер 0x60 */
+    e_stp_off(21, 22, 31, 2);
+    e_stp_off(23, 24, 31, 4);
+    e_stp_off(25, 26, 31, 6);
+    e_stp_off(27, 28, 31, 8);
+    e_str_x(30, 31, 0x50);
+    e_adrp(0, G_TOP); e_ldr_x(19, 0, (uint32_t)(G_TOP & 0xFFF));
+    size_t c_notop = cb_off; cb32(0);
+    e_ldr_x(20, 19, 0);
+    size_t c_nopath = cb_off; cb32(0);
+    e_mov(0, 20);
+    e_adrp(1, s_roms); e_addi(1, 1, (uint32_t)(s_roms & 0xFFF));
+    e_movi(2, 17);
+    e_bl(P_STRNCMP);
+    size_t c_notroms = cb_off; cb32(0);
+    e_ldr_x(21, 19, 0x10);
+    size_t c_noent = cb_off; cb32(0);
+    e_ldr_w(4, 21, 0);
+    size_t c_empty = cb_off; cb32(0);
+    e_ldr_x(5, 21, 8);
+    size_t c_noitems = cb_off; cb32(0);
+    e_ldr_x(6, 5, 0);
+    size_t c_nofirst = cb_off; cb32(0);
+    e_ldr_w(7, 6, 0x1c);
+    e_add_w(7, 7, 1);
+    size_t c_has = cb_off; cb32(0);
+    /* ищем самый свежий recent, чей path есть в текущем списке */
+    e_ldr_w(24, 21, 0);                  /* count */
+    e_ldr_x(23, 21, 8);                  /* items */
+    e_movi(25, 0);                       /* recent index */
+    uint64_t c_loop = cbpc();
+    e_mov(0, 25);
+    e_bl(A_RECENTS_AT);
+    size_t c_norec = cb_off; cb32(0);
+    e_mov(26, 0);
+    e_mov(0, 26);
+    e_bl(A_RECENT_ENTRY);
+    size_t c_noentry = cb_off; cb32(0);
+    e_mov(27, 0);
+    e_ldr_w(1, 27, 0x18);
+    e_cmp_i(1, 1);                       /* ENTRY_PAK */
+    size_t c_pak = cb_off; cb32(0);      /* b.ne -> check */
+    e_mov(0, 27); e_bl(A_ENTRY_FREE);
+    uint64_t c_next = cbpc();
+    e_add_w(25, 25, 1);
+    e_b(c_loop);
+    uint64_t c_check = cbpc();
+    e_movi(28, 0);                       /* j */
+    uint64_t c_inner = cbpc();
+    e_cmp_r(28, 24);
+    size_t c_ige = cb_off; cb32(0);
+    e_ldr_reg(9, 23, 28, 3);
+    size_t c_in0 = cb_off; cb32(0);
+    e_ldr_x(0, 9, 0);
+    size_t c_in1 = cb_off; cb32(0);
+    e_ldr_x(1, 27, 0);
+    e_bl(P_STRCMP);
+    size_t c_match = cb_off; cb32(0);
+    uint64_t c_inner_next = cbpc();
+    e_add_w(28, 28, 1);
+    e_b(c_inner);
+    uint64_t c_notfound = cbpc();
+    e_mov(0, 27); e_bl(A_ENTRY_FREE);
+    e_b(c_next);
+    uint64_t c_found = cbpc();
+    /* display = "ПРОДОЛЖИТЬ: " + real name; unique = display; alpha = -1 */
+    e_addi(0, 31, 0x60);
+    e_movi(1, 0x100);
+    e_adrp(2, s_fmt_ss); e_addi(2, 2, (uint32_t)(s_fmt_ss & 0xFFF));
+    e_adrp(3, s_cont_prefix); e_addi(3, 3, (uint32_t)(s_cont_prefix & 0xFFF));
+    e_ldr_x(4, 27, 8);
+    e_bl(P_SNPRINTF);
+    e_addi(0, 31, 0x60);
+    e_bl(P_STRDUP);
+    size_t c_nodisp = cb_off; cb32(0);   /* cbz x0 -> fail */
+    e_str_x(0, 27, 0x10);                /* unique */
+    e_movn(1, 0);
+    e_str_w(1, 27, 0x1c);                /* alpha = -1 */
+    e_mov(0, 21); e_mov(1, 27);
+    e_bl(A_ARRAY_PUSH);
+    size_t c_pushfail = cb_off; cb32(0);
+    e_ldr_x(9, 21, 8);
+    e_ldr_w(10, 21, 0);
+    e_subi(10, 10, 1);
+    uint64_t c_shift = cbpc();
+    size_t c_shiftz = cb_off; cb32(0);
+    e_subi(11, 10, 1);
+    e_ldr_reg(12, 9, 11, 3);
+    e_str_reg(12, 9, 10, 3);
+    e_subi(10, 10, 1);
+    e_b(c_shift);
+    uint64_t c_shift_end = cbpc();
+    e_str_x(27, 9, 0);
+    e_ldr_w(10, 19, 0x18);
+    e_cmp_i(10, 28);
+    size_t c_acap = cb_off; cb32(0);     /* b.le -> cap_ok */
+    e_movi(10, 28);
+    uint64_t c_cap_ok = cbpc();
+    e_movi(11, 0);
+    e_addi(13, 19, 0x1c);
+    uint64_t c_aloop = cbpc();
+    e_cmp_r(11, 10);
+    size_t c_adone = cb_off; cb32(0);
+    e_add_reg_shift(12, 13, 11, 2);
+    e_ldr_w(14, 12, 0);
+    e_add_w(14, 14, 1);
+    e_str_w(14, 12, 0);
+    e_add_w(11, 11, 1);
+    e_b(c_aloop);
+    uint64_t c_aend = cbpc();
+    e_str_w(31, 19, 0x8c);               /* selected = 0 */
+    e_movi(0, 0); e_bl(A_ROWCOUNT);
+    e_ldr_x(1, 19, 0x10); e_ldr_w(2, 1, 0);
+    e_movi(3, 1);
+    e_cmp_i(0, 0);
+    e_csel(0, 0, 3, 0xC /*GT*/);
+    e_cmp_r(0, 2);
+    e_csel(0, 0, 2, 0xD /*LE*/);
+    e_stp_w_off(31, 0, 19, 0x90);
+    e_adrp(0, 0x4d7000ULL); e_movi(1, 1); e_strb(1, 0, 0xc04);
+    size_t c_success = cb_off; cb32(0);  /* b -> done */
+    uint64_t c_fail = cbpc();
+    e_mov(0, 27); e_bl(A_ENTRY_FREE);
+    uint64_t c_done = cbpc();
+    e_ldr_x(30, 31, 0x50);
+    e_ldp_off(27, 28, 31, 8);
+    e_ldp_off(25, 26, 31, 6);
+    e_ldp_off(23, 24, 31, 4);
+    e_ldp_off(21, 22, 31, 2);
+    e_ldp_post(19, 20, 31, 44);
+    e_ret();
+    /* fixups continue */
+    fix_cbz64_cave(c_notop, c_done, 19);
+    fix_cbz64_cave(c_nopath, c_done, 20);
+    {   int64_t d = (int64_t)c_done - (int64_t)(cave_vaddr + c_notroms);
+        wr32(cave + c_notroms, 0x35000000u | (((uint32_t)((d >> 2) & 0x7FFFF)) << 5) | 0u); }
+    fix_cbz64_cave(c_noent, c_done, 21);
+    fix_cbz_cave(c_empty, c_done, 4);
+    fix_cbz64_cave(c_noitems, c_done, 5);
+    fix_cbz64_cave(c_nofirst, c_done, 6);
+    fix_cbz_cave(c_has, c_done, 7);
+    fix_cbz64_cave(c_norec, c_done, 0);
+    fix_cbz64_cave(c_noentry, c_next, 0);
+    fix_bcond_cave(c_pak, 0x1 /*NE*/, c_check);
+    fix_bcond_cave(c_ige, 0xA /*GE*/, c_notfound);
+    fix_cbz64_cave(c_in0, c_inner_next, 9);
+    fix_cbz64_cave(c_in1, c_inner_next, 0);
+    fix_cbz_cave(c_match, c_found, 0);
+    fix_cbz64_cave(c_nodisp, c_fail, 0);
+    fix_cbz_cave(c_pushfail, c_fail, 0);
+    fix_cbz64_cave(c_shiftz, c_shift_end, 10);
+    fix_bcond_cave(c_acap, 0xD /*LE*/, c_cap_ok);
+    fix_bcond_cave(c_adone, 0xA /*GE*/, c_aend);
+    {   int64_t d = (int64_t)c_done - (int64_t)(cave_vaddr + c_success);
+        wr32(cave + c_success, 0x14000000u | (uint32_t)((d >> 2) & 0x3FFFFFF)); }
+
+    /* хук в начале GameList_handleInput: один раз на Directory вставить пункт */
+    cs_handle_hook_va = cave_vaddr + cb_off;
+    e_stp_pre(0, 1, 31, -6);             /* 0x30 */
+    e_stp_off(2, 3, 31, 2);
+    e_str_x(30, 31, 0x20);
+    e_bl(cont_va);
+    e_ldr_x(30, 31, 0x20);
+    e_ldp_off(2, 3, 31, 2);
+    e_ldp_post(0, 1, 31, 6);
+    cb32(0xD11C43FFu);                   /* sub sp,sp,#0x710 */
+    e_b(0x41d844ULL);
+
+    /* хук openSelected: A на нашем пункте — с сейва */
+    cs_open_hook_va = cave_vaddr + cb_off;
+    e_adrp(9, G_TOP); e_ldr_x(9, 9, (uint32_t)(G_TOP & 0xFFF));
+    size_t o_notop = cb_off; cb32(0);
+    e_ldr_x(11, 9, 0x10);
+    size_t o_noent = cb_off; cb32(0);
+    e_ldr_w(10, 9, 0x8c);
+    e_ldr_w(12, 11, 0);
+    e_cmp_i(10, 0);
+    size_t o_neg = cb_off; cb32(0);
+    e_cmp_r(10, 12);
+    size_t o_ge = cb_off; cb32(0);
+    e_ldr_x(13, 11, 8);
+    e_ldr_reg(14, 13, 10, 3);
+    size_t o_noe = cb_off; cb32(0);
+    e_ldr_w(15, 14, 0x1c);
+    e_add_w(15, 15, 1);
+    size_t o_nset = cb_off; cb32(0);     /* cbnz w15 -> pass */
+    e_adrp(9, G_RESUME); e_movi(10, 1); e_strb(10, 9, 1);
+    uint64_t o_pass = cbpc();
+    cb32(0xA9BD53F3u);                   /* stp x19,x20,[sp,#-0x30]! */
+    e_b(0x416814ULL);
+    fix_cbz64_cave(o_notop, o_pass, 9);
+    fix_cbz64_cave(o_noent, o_pass, 11);
+    fix_bcond_cave(o_neg, 0xB /*LT*/, o_pass);
+    fix_bcond_cave(o_ge, 0xA /*GE*/, o_pass);
+    fix_cbz64_cave(o_noe, o_pass, 14);
+    {   int64_t d = (int64_t)o_pass - (int64_t)(cave_vaddr + o_nset);
+        wr32(cave + o_nset, 0x35000000u | (((uint32_t)((d >> 2) & 0x7FFFF)) << 5) | 15u); }
+
     /* ==================== обработчик id 42 ==================== */
     cs_stub_act_va = cave_vaddr + cb_off;
     e_cmp_i(0, 42);
@@ -763,23 +980,29 @@ static int build_console_search(void) {
 
 
 static int patch_console_search(void) {
-    if (!cs_stub_item_va || !cs_stub_item2_va || !cs_stub_act_va || !cs_leave_hook_va || !cs_hint_hook_va) return 0;
+    if (!cs_stub_item_va || !cs_stub_item2_va || !cs_stub_act_va || !cs_leave_hook_va || !cs_hint_hook_va || !cs_handle_hook_va || !cs_open_hook_va) return 0;
     uint8_t *p = file_ptr(0x41c910ULL, 4);
     uint8_t *q = file_ptr(0x49c330ULL, 4);
     uint8_t *r = file_ptr(0x41e3b8ULL, 4);
     uint8_t *lv = file_ptr(0x416600ULL, 4);
     uint8_t *hb = file_ptr(0x4293c0ULL, 4);
-    if (!p || !q || !r || !lv || !hb) return 0;
+    uint8_t *hh = file_ptr(0x41d840ULL, 4);
+    uint8_t *os = file_ptr(0x416810ULL, 4);
+    if (!p || !q || !r || !lv || !hb || !hh || !os) return 0;
     if (rd32(p) != 0xB9403FF3u) return 0; /* ldr w19,[sp,#0x3c] */
     if (rd32(r) != 0xB940D3E1u) return 0; /* ldr w1,[sp,#0xd0] */
     if (rd32(q) != 0xA9B853F3u) return 0; /* stp x19,x20,[sp,#-0x80]! */
     if (rd32(lv) != 0xA9BB53F3u) return 0; /* stp x19,x20,[sp,#-0x50]! */
     if (rd32(hb) != 0xD10843FFu) return 0; /* sub sp,sp,#0x210 */
+    if (rd32(hh) != 0xD11C43FFu) return 0; /* sub sp,sp,#0x710 */
+    if (rd32(os) != 0xA9BD53F3u) return 0; /* stp x19,x20,[sp,#-0x30]! */
     wr32(p, enc_b(0x41c910ULL, cs_stub_item_va));
     wr32(r, enc_b(0x41e3b8ULL, cs_stub_item2_va));
     wr32(q, enc_b(0x49c330ULL, cs_stub_act_va));
     wr32(lv, enc_b(0x416600ULL, cs_leave_hook_va));
     wr32(hb, enc_b(0x4293c0ULL, cs_hint_hook_va));
+    wr32(hh, enc_b(0x41d840ULL, cs_handle_hook_va));
+    wr32(os, enc_b(0x416810ULL, cs_open_hook_va));
     return 1;
 }
 
