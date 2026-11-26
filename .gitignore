@@ -1,0 +1,7 @@
+# runtime files that live on the SD card, not in the repository
+*.before
+*.orig
+bootlogo_before.bmp
+Mr712_patch.log
+Thumbs.db
+desktop.ini
