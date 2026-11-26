@@ -201,6 +201,9 @@ static int cs_built, cs_patched;
 #define A_BLITBUTTON  0x437140ULL  /* GFX_blitButton(hint, button, dst, rect) */
 #define A_ROUNDRECT   0x434c10ULL  /* UI_fillRoundedRect(dst,x,y,w,h,r,color) */
 #define A_CLEARLAYERS 0x4247f0ULL  /* PLAT_clearLayers(layer) */
+#define A_MAPRGB      0x406b50ULL  /* SDL_MapRGB(format,r,g,b) */
+#define A_FILLRECT    0x406970ULL  /* SDL_FillRect(surface,rect,pixel) */
+#define A_LOADTHUMB   0x4a1dc0ULL  /* startLoadThumb(path, compose) */
 #define P_GETENV      0x407220ULL
 #define P_SETENV      0x406640ULL
 #define P_STRDUP      0x407200ULL
@@ -368,7 +371,7 @@ static int build_console_search(void) {
     cb_off = cave_len;
     while (cb_off % 8) cave[cb_off++] = 0;
 
-    uint64_t s_label = cs_str(&cs_label_off, "Поиск игры в консоли");
+    uint64_t s_label = cs_str(&cs_label_off, "Поиск игр по консоли");
     uint64_t s_prompt = cs_str(&cs_prompt_off, "Поиск в консоли \x01");
     uint64_t s_roms = cs_str(&cs_roms_off, "/mnt/SDCARD/Roms/");
     uint64_t s_tmpdir = cs_str(&cs_tmpdir_off, "/tmp/.nxsearch");
@@ -609,7 +612,21 @@ static int build_console_search(void) {
     /* пусто -> снять миниатюру/фон с экрана */
     e_ldr_x(0, 19, 0x10); e_ldr_w(0, 0, 0);
     size_t p_nonempty = cb_off; cb32(0); /* cbnz w0 -> skip */
-    e_movi(0, 3); e_bl(A_CLEARLAYERS);   /* PLAT_clearLayers(LAYER_THUMBNAIL) */
+    e_adrp(0, 0x4d97d0ULL); e_ldr_x(0, 0, (uint32_t)(0x4d97d0ULL & 0xFFF));
+    size_t p_noscreen = cb_off; cb32(0); /* cbz x0 -> skip */
+    e_str_x(0, 31, 0x58);
+    e_ldr_x(1, 0, 8);                    /* screen->format */
+    e_mov(0, 1);
+    e_movi(1, 0); e_movi(2, 0); e_movi(3, 0);
+    e_bl(A_MAPRGB);
+    e_mov(2, 0);
+    e_ldr_x(0, 31, 0x58);
+    e_movi(1, 0);
+    e_bl(A_FILLRECT);
+    /* и заставить загрузчик картинок забыть обложку */
+    e_adrp(0, s_empty); e_addi(0, 0, (uint32_t)(s_empty & 0xFFF));
+    e_movi(1, 0);
+    e_bl(A_LOADTHUMB);
     uint64_t l_nonempty = cbpc();
     e_str_w(31, 19, 0x8c);               /* selected = 0 */
     e_movi(0, 0); e_bl(A_ROWCOUNT);
@@ -657,6 +674,7 @@ static int build_console_search(void) {
     fix_cbz_cave(p_noi, l_kbd, 23);
     {   int64_t d = (int64_t)l_nonempty - (int64_t)(cave_vaddr + p_nonempty);
         wr32(cave + p_nonempty, 0x35000000u | (((uint32_t)((d >> 2) & 0x7FFFF)) << 5) | 0u); }
+    fix_cbz64_cave(p_noscreen, l_nonempty, 0);
     fix_cbz64_cave(p_nq, s_cancel, 21);
     fix_cbz_cave(p_eq0, s_cancel, 0);
     {   int64_t d = (int64_t)l_edit_build - (int64_t)(cave_vaddr + p_edit);
@@ -1003,6 +1021,9 @@ static int build_console_search(void) {
     e_movi(2, 17);
     e_bl(P_STRNCMP);
     size_t g3 = cb_off; cb32(0);
+    e_bl(A_ISSEARCH);
+    size_t g4 = cb_off; cb32(0);
+    uint64_t l_type = cbpc();
     e_ldr_w(0, 19, 0x18);
     e_cmp_i(0, 2);
     size_t p_eq = cb_off; cb32(0);
@@ -1022,8 +1043,8 @@ static int build_console_search(void) {
     fix_cbz_cave(p_cbz, l_skip, 0);
     fix_cbz64_cave(g1, l_skip, 0);
     fix_cbz64_cave(g2, l_skip, 0);
-    {   int64_t d = (int64_t)l_skip - (int64_t)(cave_vaddr + g3);
-        wr32(cave + g3, 0x35000000u | (((uint32_t)((d >> 2) & 0x7FFFF)) << 5) | 0u); }
+    fix_cbz_cave(g3, l_type, 0);         /* путь под Roms/ -> пункт есть */
+    fix_cbz_cave(g4, l_skip, 0);         /* и в результатах поиска */
 
     cs_stub_item2_va = cave_vaddr + cb_off;
     e_adrp(0, G_TOP); e_ldr_x(0, 0, (uint32_t)(G_TOP & 0xFFF));
@@ -1034,6 +1055,9 @@ static int build_console_search(void) {
     e_movi(2, 17);
     e_bl(P_STRNCMP);
     size_t h3 = cb_off; cb32(0);
+    e_bl(A_ISSEARCH);
+    size_t h4 = cb_off; cb32(0);
+    uint64_t l_type2 = cbpc();
     e_ldr_w(0, 21, 0x18);
     e_cmp_i(0, 2);
     size_t q_eq = cb_off; cb32(0);
@@ -1053,8 +1077,8 @@ static int build_console_search(void) {
     fix_cbz_cave(q_cbz, q_skip, 0);
     fix_cbz64_cave(h1, q_skip, 0);
     fix_cbz64_cave(h2, q_skip, 0);
-    {   int64_t d = (int64_t)q_skip - (int64_t)(cave_vaddr + h3);
-        wr32(cave + h3, 0x35000000u | (((uint32_t)((d >> 2) & 0x7FFFF)) << 5) | 0u); }
+    fix_cbz_cave(h3, l_type2, 0);
+    fix_cbz_cave(h4, q_skip, 0);
 
     cave_len = cb_off;
     return 1;
