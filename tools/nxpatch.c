@@ -609,7 +609,7 @@ static int build_console_search(void) {
     /* пусто -> снять миниатюру/фон с экрана */
     e_ldr_x(0, 19, 0x10); e_ldr_w(0, 0, 0);
     size_t p_nonempty = cb_off; cb32(0); /* cbnz w0 -> skip */
-    e_movi(0, 0); e_bl(A_CLEARLAYERS);   /* PLAT_clearLayers(LAYER_ALL) */
+    e_movi(0, 3); e_bl(A_CLEARLAYERS);   /* PLAT_clearLayers(LAYER_THUMBNAIL) */
     uint64_t l_nonempty = cbpc();
     e_str_w(31, 19, 0x8c);               /* selected = 0 */
     e_movi(0, 0); e_bl(A_ROWCOUNT);
