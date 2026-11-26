@@ -8,7 +8,9 @@ SEARCH	ПОИСК
 OPEN	ОТКРЫТЬ
 OPTIONS	МЕНЮ
 RESUME	ПРОДОЛЖИТЬ
-NETPLAY	Игра по сети
+NETPLAY	ИГРА ПО СЕТИ
+SHIFT	ЗАГЛАВНЫЕ
+SELECT	ВЫБРАТЬ
 BACK	НАЗАД
 %d game	%d игр
 %d games	%d игр

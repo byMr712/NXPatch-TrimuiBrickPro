@@ -350,7 +350,7 @@ static int build_console_search(void) {
     uint64_t s_roms = cs_str(&cs_roms_off, "/mnt/SDCARD/Roms/");
     uint64_t s_tmpdir = cs_str(&cs_tmpdir_off, "/tmp/.nxsearch");
     uint64_t s_title = cs_str(&cs_title_off, "Поиск: %s");
-    uint64_t s_back = cs_str(&cs_back_off, "Назад в меню поиска");
+    uint64_t s_back = cs_str(&cs_back_off, "НАЗАД В ПОИСК");
     uint64_t s_b = cs_str(&cs_btn_b_off, "B");
     uint64_t s_x = cs_str(&cs_btn_x_off, "X");
     uint64_t s_a = cs_str(&cs_btn_a_off, "A");
