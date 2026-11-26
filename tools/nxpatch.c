@@ -165,7 +165,7 @@ static size_t grid_up_off, grid_down_off;
  * Все адреса — из nextui.elf 2.5.1, применение защищено проверкой сигнатур. */
 static size_t cb_off;
 static size_t cs_label_off, cs_prompt_off, cs_roms_off, cs_tmpdir_off, cs_title_off;
-static size_t cs_back_off, cs_btn_b_off, cs_btn_x_off, cs_btn_a_off, cs_resume_off, cs_open_off;
+static size_t cs_back_off;
 static uint64_t cs_stub_item_va, cs_stub_item2_va, cs_stub_act_va;
 static uint64_t cs_leave_hook_va, cs_hint_hook_va;
 static int cs_built, cs_patched;
@@ -198,7 +198,6 @@ static int cs_built, cs_patched;
 #define G_STACK       0x4d8e80ULL  /* Array* stack */
 #define G_BGREUPLOAD  0x510428ULL
 #define G_SEARCHQ     0x510430ULL  /* char search_query[256] */
-#define G_RESUME      0x50e1d8ULL  /* ResumeState resume */
 #define G_PAD         0x50e0d0ULL
 #define L_FAUXSEARCH  0x4ae930ULL  /* FAUX_SEARCH_PATH */
 #define L_FMT_S       0x4b5588ULL  /* "%s" */
@@ -351,11 +350,6 @@ static int build_console_search(void) {
     uint64_t s_tmpdir = cs_str(&cs_tmpdir_off, "/tmp/.nxsearch");
     uint64_t s_title = cs_str(&cs_title_off, "Поиск: %s");
     uint64_t s_back = cs_str(&cs_back_off, "НАЗАД В ПОИСК");
-    uint64_t s_b = cs_str(&cs_btn_b_off, "B");
-    uint64_t s_x = cs_str(&cs_btn_x_off, "X");
-    uint64_t s_a = cs_str(&cs_btn_a_off, "A");
-    uint64_t s_resume = cs_str(&cs_resume_off, "ПРОДОЛЖИТЬ");
-    uint64_t s_open = cs_str(&cs_open_off, "ОТКРЫТЬ");
     while (cb_off % 8) cave[cb_off++] = 0;
 
     /* ==================== заполнение результатов ====================
@@ -671,34 +665,10 @@ static int build_console_search(void) {
     size_t h_hi = cb_off; cb32(0);       /* b.hi -> pass */
     e_bl(A_ISSEARCH);
     size_t h_no = cb_off; cb32(0);       /* cbz w0 -> pass */
-    /* B + назад */
-    e_adrp(0, s_b); e_addi(0, 0, (uint32_t)(s_b & 0xFFF));
-    e_str_x(0, 19, 0);
+    /* первый пара — B/BACK; меняем только текст, остальные подсказки
+     * (Y netplay, X resume, A open) остаются штатными и условными */
     e_adrp(0, s_back); e_addi(0, 0, (uint32_t)(s_back & 0xFFF));
     e_str_x(0, 19, 8);
-    e_addi(9, 19, 0x10);
-    /* X + Продолжить: только если в результатах есть строки и can_resume */
-    e_adrp(0, G_TOP); e_ldr_x(0, 0, (uint32_t)(G_TOP & 0xFFF));
-    size_t h_nt = cb_off; cb32(0);       /* cbz x0 -> no_resume */
-    e_ldr_x(0, 0, 0x10);                 /* entries */
-    size_t h_ne = cb_off; cb32(0);       /* cbz x0 -> no_resume */
-    e_ldr_w(0, 0, 0);                    /* count */
-    size_t h_nc = cb_off; cb32(0);       /* cbz w0 -> no_resume */
-    e_adrp(0, G_RESUME); e_ldrb(0, 0, (uint32_t)(G_RESUME & 0xFFF));
-    size_t h_ny = cb_off; cb32(0);       /* cbz w0 -> no_resume */
-    e_adrp(0, s_x); e_addi(0, 0, (uint32_t)(s_x & 0xFFF));
-    e_str_x(0, 9, 0);
-    e_adrp(0, s_resume); e_addi(0, 0, (uint32_t)(s_resume & 0xFFF));
-    e_str_x(0, 9, 8);
-    e_addi(9, 9, 0x10);
-    uint64_t h_nores = cbpc();
-    /* A + Открыть */
-    e_adrp(0, s_a); e_addi(0, 0, (uint32_t)(s_a & 0xFFF));
-    e_str_x(0, 9, 0);
-    e_adrp(0, s_open); e_addi(0, 0, (uint32_t)(s_open & 0xFFF));
-    e_str_x(0, 9, 8);
-    e_addi(9, 9, 0x10);
-    e_str_x(31, 9, 0);
     e_movi(0, 24);
     e_str_x(0, 31, 0x28);                /* left = 24 (saved x3) */
     uint64_t h_pass = cbpc();
@@ -710,10 +680,6 @@ static int build_console_search(void) {
     e_b(0x4293c4ULL);
     fix_bcond_cave(h_hi, 0x8 /*HI*/, h_pass);
     fix_cbz_cave(h_no, h_pass, 0);
-    fix_cbz64_cave(h_nt, h_nores, 0);
-    fix_cbz64_cave(h_ne, h_nores, 0);
-    fix_cbz_cave(h_nc, h_nores, 0);
-    fix_cbz_cave(h_ny, h_nores, 0);
 
     /* ==================== обработчик id 42 ==================== */
     cs_stub_act_va = cave_vaddr + cb_off;
