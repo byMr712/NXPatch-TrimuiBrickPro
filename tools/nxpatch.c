@@ -59,6 +59,8 @@ static size_t cave_len;
 
 static uint64_t cave_vaddr, ins_at, insert_size, cave_ext, max_cave;
 static uint64_t cont_state_va;
+static uint64_t kb_title_va, kb_hint_va, kb_badge_va;
+static int kb_built, kb_patched;
 
 /* Код-помощник для copy-сайтов контекстного меню (см. fix_label_copy).
  * x16 = dst, x17 = src, копирует до NUL; сохраняет/восстанавливает x0,x1 и флаги. */
@@ -165,7 +167,7 @@ static size_t grid_up_off, grid_down_off;
  * поиска не вызывается. Код собирается в кейве.
  * Все адреса — из nextui.elf 2.5.1, применение защищено проверкой сигнатур. */
 static size_t cb_off;
-static size_t cs_label_off, cs_prompt_off, cs_roms_off, cs_tmpdir_off, cs_title_off;
+static size_t cs_label_off, cs_prompt_off, cs_roms_off, cs_tmpdir_off, cs_title_off, cs_tmp_off;
 static size_t cs_back_off, cs_cont_prefix_off, cs_fmt_ss_off;
 static uint64_t cs_stub_item_va, cs_stub_item2_va, cs_stub_act_va;
 static uint64_t cs_leave_hook_va, cs_hint_hook_va, cs_handle_hook_va, cs_open_hook_va;
@@ -191,6 +193,14 @@ static int cs_built, cs_patched;
 #define P_STRNCMP     0x406b30ULL
 #define P_STRCMP      0x407170ULL
 #define P_MEMMOVE     0x407450ULL
+#define A_RENDERTEXT  0x43a7e0ULL  /* GFX_renderText(font, text, color) */
+#define A_UPBLIT      0x406be0ULL  /* SDL_UpperBlit(src, rect, dst, dstrect) */
+#define A_FREESURF    0x406400ULL  /* SDL_FreeSurface(s) */
+#define A_HINTBAR     0x4293c0ULL  /* UI_renderButtonHintBarAt(dst, pairs, alpha, left) */
+#define A_BTNWIDTH    0x437820ULL  /* GFX_getButtonWidth(hint, button) */
+#define A_BLITBUTTON  0x437140ULL  /* GFX_blitButton(hint, button, dst, rect) */
+#define A_ROUNDRECT   0x434c10ULL  /* UI_fillRoundedRect(dst,x,y,w,h,r,color) */
+#define A_CLEARLAYERS 0x4247f0ULL  /* PLAT_clearLayers(layer) */
 #define P_GETENV      0x407220ULL
 #define P_SETENV      0x406640ULL
 #define P_STRDUP      0x407200ULL
@@ -257,6 +267,10 @@ static void e_cmp_i(int rn, uint32_t imm) { cb32(0x71000000u | ((imm & 0xFFF) <<
 static void e_cmp_r(int rn, int rm) { cb32(0x6B000000u | ((uint32_t)rm << 16) | ((uint32_t)rn << 5) | 31u); }
 static void e_add_w(int rd, int rn, uint32_t imm) { cb32(0x11000000u | ((imm & 0xFFF) << 10) | ((uint32_t)rn << 5) | (uint32_t)rd); }
 static void e_subi(int rd, int rn, uint32_t imm) { cb32(0xD1000000u | ((imm & 0xFFF) << 10) | ((uint32_t)rn << 5) | (uint32_t)rd); }
+static void e_lsr(int rd, int rn, int sh) { cb32(0x53000000u | ((uint32_t)sh << 16) | (31u << 10) | ((uint32_t)rn << 5) | (uint32_t)rd); }
+static void e_sub_w_reg(int rd, int rn, int rm) { cb32(0x4B000000u | ((uint32_t)rm << 16) | ((uint32_t)rn << 5) | (uint32_t)rd); }
+static void e_add_w_reg(int rd, int rn, int rm) { cb32(0x0B000000u | ((uint32_t)rm << 16) | ((uint32_t)rn << 5) | (uint32_t)rd); }
+static uint64_t cb_data64(uint64_t v) { while (cb_off % 8) cave[cb_off++] = 0; uint64_t a = cave_vaddr + cb_off; memcpy(cave + cb_off, &v, 8); cb_off += 8; return a; }
 static void e_stp_pre(int rt, int rt2, int rn, int imm7) {
     cb32(0xA9800000u | ((uint32_t)(imm7 & 0x7F) << 15) | ((uint32_t)rt2 << 10) | ((uint32_t)rn << 5) | (uint32_t)rt);
 }
@@ -355,13 +369,14 @@ static int build_console_search(void) {
     while (cb_off % 8) cave[cb_off++] = 0;
 
     uint64_t s_label = cs_str(&cs_label_off, "Поиск игры в консоли");
-    uint64_t s_prompt = cs_str(&cs_prompt_off, "Поиск в консоли");
+    uint64_t s_prompt = cs_str(&cs_prompt_off, "Поиск в консоли \x01");
     uint64_t s_roms = cs_str(&cs_roms_off, "/mnt/SDCARD/Roms/");
     uint64_t s_tmpdir = cs_str(&cs_tmpdir_off, "/tmp/.nxsearch");
     uint64_t s_title = cs_str(&cs_title_off, "Поиск: %s");
     uint64_t s_back = cs_str(&cs_back_off, "НАЗАД В ПОИСК");
     uint64_t s_cont_prefix = cs_str(&cs_cont_prefix_off, "» ");
     uint64_t s_fmt_ss = cs_str(&cs_fmt_ss_off, "%s%s");
+    uint64_t s_empty = cs_str(&cs_tmp_off, "");
     while (cb_off % 8) cave[cb_off++] = 0;
 
     /* ==================== заполнение результатов ====================
@@ -525,9 +540,20 @@ static int build_console_search(void) {
     e_adrp(0, G_TOP); e_ldr_x(20, 0, (uint32_t)(G_TOP & 0xFFF));
     uint64_t l_console_ready = cbpc();
     size_t p_ct = cb_off; cb32(0);       /* cbz x20 -> cancel */
-    /* клавиатура: initial = edit ? search_query : NULL */
-    e_adrp(0, s_prompt); e_addi(0, 0, (uint32_t)(s_prompt & 0xFFF));
+    /* клавиатура: prompt = "Поиск в консоли \x01<имя консоли>", initial = edit ? search_query : NULL */
+    e_addi(0, 31, 0x60);
+    e_movi(1, 0x100);
+    e_adrp(2, s_fmt_ss); e_addi(2, 2, (uint32_t)(s_fmt_ss & 0xFFF));
+    e_adrp(3, s_prompt); e_addi(3, 3, (uint32_t)(s_prompt & 0xFFF));
+    e_ldr_x(4, 20, 8);
+    size_t p_noname = cb_off; cb32(0);   /* cbnz x4 -> go */
+    e_adrp(4, s_empty); e_addi(4, 4, (uint32_t)(s_empty & 0xFFF));
+    uint64_t p_go = cbpc();
+    e_bl(P_SNPRINTF);
+    e_addi(0, 31, 0x60);
     e_movi(1, 0);
+    {   int64_t d = (int64_t)p_go - (int64_t)(cave_vaddr + p_noname);
+        wr32(cave + p_noname, 0x35000000u | (((uint32_t)((d >> 2) & 0x7FFFF)) << 5) | 4u); }
     size_t p_noi = cb_off; cb32(0);      /* cbz w23 -> kbd */
     e_adrp(1, G_SEARCHQ); e_addi(1, 1, (uint32_t)(G_SEARCHQ & 0xFFF));
     uint64_t l_kbd = cbpc();
@@ -580,6 +606,11 @@ static int build_console_search(void) {
     /* заполнить */
     e_mov(0, 20); e_mov(1, 19);
     e_bl(fill_va);
+    /* пусто -> снять миниатюру/фон с экрана */
+    e_ldr_x(0, 19, 0x10); e_ldr_w(0, 0, 0);
+    size_t p_nonempty = cb_off; cb32(0); /* cbnz w0 -> skip */
+    e_movi(0, 0); e_bl(A_CLEARLAYERS);   /* PLAT_clearLayers(LAYER_ALL) */
+    uint64_t l_nonempty = cbpc();
     e_str_w(31, 19, 0x8c);               /* selected = 0 */
     e_movi(0, 0); e_bl(A_ROWCOUNT);
     e_ldr_x(1, 19, 0x10); e_ldr_w(2, 1, 0);
@@ -624,6 +655,8 @@ static int build_console_search(void) {
         wr32(cave + p_cr, 0x14000000u | (uint32_t)((d >> 2) & 0x3FFFFFF)); }
     fix_cbz64_cave(p_ct, s_cancel, 20);
     fix_cbz_cave(p_noi, l_kbd, 23);
+    {   int64_t d = (int64_t)l_nonempty - (int64_t)(cave_vaddr + p_nonempty);
+        wr32(cave + p_nonempty, 0x35000000u | (((uint32_t)((d >> 2) & 0x7FFFF)) << 5) | 0u); }
     fix_cbz64_cave(p_nq, s_cancel, 21);
     fix_cbz_cave(p_eq0, s_cancel, 0);
     {   int64_t d = (int64_t)l_edit_build - (int64_t)(cave_vaddr + p_edit);
@@ -1028,6 +1061,233 @@ static int build_console_search(void) {
 }
 
 
+/* ==================== доработки клавиатуры поиска ====================
+ * 1) заголовок «Поиск в консоли <Имя>»: префикс серый, имя консоли белое,
+ *    всё по центру (в строке-запросе имя отделено байтом 0x01);
+ * 2) подсказки внизу по центру (заменён только вызов из клавиатуры);
+ * 3) у клавиш «Пробел»/«Готово» справа рисуются значки L1/R1, а сами L1/R1
+ *    вставляют пробел и подтверждают ввод. */
+
+static uint64_t s_kbpref, s_kbl1, s_kbr1, s_kbempty, s_kbgray, s_kbwhite, s_kbblack;
+
+/* заголовок: x27 = screen, [sp+0xe8] = title, [sp+0x8c] = center_x,
+ * [sp+0x60] -> таблица шрифтов (+0x20 font.small), w22 = y.
+ * Возврат — в 0x42ac78. */
+static uint64_t build_kb_title(void) {
+    uint64_t va = cave_vaddr + cb_off;
+    e_stp_pre(19, 20, 31, -14);          /* 0xE0 */
+    e_stp_off(21, 22, 31, 2);
+    e_stp_off(23, 24, 31, 4);
+    e_stp_off(25, 26, 31, 6);
+    e_stp_off(27, 28, 31, 8);
+    e_str_x(30, 31, 0x50);
+    e_mov(24, 22);                       /* y */
+    e_addi(9, 31, 0x70);                 /* sp вызывающего (kb_draw) */
+    e_ldr_x(1, 9, 0xE8);                 /* title */
+    size_t t_notitle = cb_off; cb32(0);  /* cbz x1 -> done */
+    e_ldrb(0, 1, 0);
+    size_t t_empty = cb_off; cb32(0);    /* cbz w0 -> done */
+    e_mov(11, 1);
+    uint64_t t_scan = cbpc();
+    e_ldrb(0, 11, 0);
+    size_t t_end = cb_off; cb32(0);      /* cbz w0 -> single */
+    e_cmp_i(0, 1);
+    size_t t_two = cb_off; cb32(0);      /* b.eq -> two */
+    e_addi(11, 11, 1);
+    e_b(t_scan);
+    /* одна строка: как в штатном коде — серый, по центру */
+    uint64_t t_single = cbpc();
+    e_addi(9, 31, 0x70); e_ldr_x(0, 9, 0x60); e_ldr_x(0, 0, 0x20);
+    e_adrp(2, s_kbgray); e_addi(2, 2, (uint32_t)(s_kbgray & 0xFFF)); e_ldr_w(2, 2, 0);
+    e_bl(A_RENDERTEXT);
+    e_mov(10, 0);
+    size_t t_s_none = cb_off; cb32(0);   /* cbz x0 -> done */
+    e_ldr_w(4, 10, 0x10);
+    e_addi(9, 31, 0x70); e_ldr_w(5, 9, 0x8c);
+    e_lsr(6, 4, 1);
+    e_sub_w_reg(5, 5, 6);
+    e_str_w(5, 31, 0x58); e_str_w(24, 31, 0x5c);
+    e_mov(0, 10); e_movi(1, 0); e_mov(2, 27); e_addi(3, 31, 0x58);
+    e_bl(A_UPBLIT);
+    e_mov(0, 10); e_bl(A_FREESURF);
+    size_t t_s_done = cb_off; cb32(0);   /* b -> done */
+    /* две части: серый префикс + белое имя */
+    uint64_t t_twotok = cbpc();
+    e_mov(21, 11);                       /* указатель на 0x01 */
+    e_addi(9, 31, 0x70); e_ldr_x(0, 9, 0x60); e_ldr_x(0, 0, 0x20);
+    e_adrp(1, s_kbpref); e_addi(1, 1, (uint32_t)(s_kbpref & 0xFFF));
+    e_adrp(2, s_kbgray); e_addi(2, 2, (uint32_t)(s_kbgray & 0xFFF)); e_ldr_w(2, 2, 0);
+    e_bl(A_RENDERTEXT);
+    e_mov(19, 0);                        /* t1 */
+    e_addi(9, 31, 0x70); e_ldr_x(0, 9, 0x60); e_ldr_x(0, 0, 0x20);
+    e_addi(1, 21, 1);
+    e_adrp(2, s_kbwhite); e_addi(2, 2, (uint32_t)(s_kbwhite & 0xFFF)); e_ldr_w(2, 2, 0);
+    e_bl(A_RENDERTEXT);
+    e_mov(20, 0);                        /* t2 */
+    /* total = w1 + w2 */
+    e_movi(23, 0);
+    size_t t_w1 = cb_off; cb32(0);       /* cbz x19 -> w2 */
+    e_ldr_w(0, 19, 0x10); e_add_w_reg(23, 23, 0);
+    uint64_t t_w2 = cbpc();
+    size_t t_w2z = cb_off; cb32(0);      /* cbz x20 -> pos */
+    e_ldr_w(0, 20, 0x10); e_add_w_reg(23, 23, 0);
+    uint64_t t_pos = cbpc();
+    e_addi(9, 31, 0x70); e_ldr_w(1, 9, 0x8c);
+    e_lsr(2, 23, 1);
+    e_sub_w_reg(1, 1, 2);                /* x = center - total/2 */
+    e_str_w(1, 31, 0x58); e_str_w(24, 31, 0x5c);
+    size_t t_t1z = cb_off; cb32(0);      /* cbz x19 -> t2 */
+    e_mov(0, 19); e_movi(1, 0); e_mov(2, 27); e_addi(3, 31, 0x58);
+    e_bl(A_UPBLIT);
+    e_ldr_w(0, 19, 0x10); e_ldr_w(1, 31, 0x58); e_add_w_reg(1, 1, 0);
+    e_str_w(1, 31, 0x58);
+    e_mov(0, 19); e_bl(A_FREESURF);
+    size_t t_t1_skip = cb_off; cb32(0);  /* b -> t2 */
+    uint64_t t_t2 = cbpc();
+    size_t t_t2z = cb_off; cb32(0);      /* cbz x20 -> done */
+    e_mov(0, 20); e_movi(1, 0); e_mov(2, 27); e_addi(3, 31, 0x58);
+    e_bl(A_UPBLIT);
+    e_mov(0, 20); e_bl(A_FREESURF);
+    uint64_t t_done = cbpc();
+    e_ldr_x(30, 31, 0x50);
+    e_ldp_off(27, 28, 31, 8);
+    e_ldp_off(25, 26, 31, 6);
+    e_ldp_off(23, 24, 31, 4);
+    e_ldp_off(21, 22, 31, 2);
+    e_ldp_post(19, 20, 31, 14);
+    e_b(0x42ac78ULL);
+    fix_cbz64_cave(t_notitle, t_done, 1);
+    fix_cbz_cave(t_empty, t_done, 0);
+    fix_cbz_cave(t_end, t_single, 0);
+    fix_bcond_cave(t_two, 0x0 /*EQ*/, t_twotok);
+    fix_cbz64_cave(t_s_none, t_done, 10);
+    {   int64_t d = (int64_t)t_done - (int64_t)(cave_vaddr + t_s_done);
+        wr32(cave + t_s_done, 0x14000000u | (uint32_t)((d >> 2) & 0x3FFFFFF)); }
+    fix_cbz64_cave(t_w1, t_w2, 19);
+    fix_cbz64_cave(t_w2z, t_pos, 20);
+    fix_cbz64_cave(t_t1z, t_t2, 19);
+    {   int64_t d = (int64_t)t_t2 - (int64_t)(cave_vaddr + t_t1_skip);
+        wr32(cave + t_t1_skip, 0x14000000u | (uint32_t)((d >> 2) & 0x3FFFFFF)); }
+    fix_cbz64_cave(t_t2z, t_done, 20);
+    return va;
+}
+
+/* центрирование полосы подсказок: x0 = screen, x1 = pairs, w2 = 204.
+ * Ширину узнаём «далёкой» отрисовкой, затем рисуем по центру. */
+static uint64_t build_kb_hintbar(void) {
+    uint64_t va = cave_vaddr + cb_off;
+    e_stp_pre(19, 20, 31, -6);           /* 0x30 */
+    e_stp_off(21, 22, 31, 2);
+    e_str_x(30, 31, 0x20);
+    e_mov(19, 0);
+    e_mov(20, 1);
+    e_mov(0, 19); e_mov(1, 20); e_movi(2, 204); e_movi(3, 10000);
+    e_bl(A_HINTBAR);
+    size_t h_none = cb_off; cb32(0);     /* cbz w0 -> done */
+    e_ldr_w(1, 19, 0x10);                /* screen->w */
+    e_sub_w_reg(1, 1, 0);
+    e_lsr(1, 1, 1);
+    e_mov(3, 1);                         /* left = (w - total)/2 */
+    e_mov(0, 19); e_mov(1, 20); e_movi(2, 204);
+    e_bl(A_HINTBAR);
+    uint64_t h_done = cbpc();
+    e_ldr_x(30, 31, 0x20);
+    e_ldp_off(21, 22, 31, 2);
+    e_ldp_post(19, 20, 31, 6);
+    e_ret();
+    fix_cbz_cave(h_none, h_done, 0);
+    return va;
+}
+
+/* значки L1/R1 у клавиш Space/Confirm: вход из 0x42a510,
+ * x23 = поверхность текста, w22 = центр клавиши, w20 = cy, w21 = колонка,
+ * x27 = screen. Возврат — в 0x42a514 (или 0x42a550, если текста нет). */
+static uint64_t build_kb_badge(void) {
+    uint64_t va = cave_vaddr + cb_off;
+    size_t b_notext = cb_off; cb32(0);   /* cbz x23 -> loop */
+    e_stp_pre(19, 20, 31, -12);          /* 0x60 */
+    e_stp_off(21, 22, 31, 2);
+    e_stp_off(23, 24, 31, 4);
+    e_stp_off(25, 26, 31, 6);
+    e_str_x(30, 31, 0x50);
+    e_mov(26, 21);                       /* col */
+    e_ldr_w(24, 23, 0x10);               /* ширина текста клавиши */
+    e_adrp(0, s_kbempty); e_addi(0, 0, (uint32_t)(s_kbempty & 0xFFF));
+    e_adrp(1, s_kbl1); e_addi(1, 1, (uint32_t)(s_kbl1 & 0xFFF));
+    size_t b_l1 = cb_off; cb32(0);       /* cbz w26 -> have */
+    e_adrp(1, s_kbr1); e_addi(1, 1, (uint32_t)(s_kbr1 & 0xFFF));
+    uint64_t b_have = cbpc();
+    e_bl(A_BTNWIDTH);
+    e_mov(25, 0);                        /* ширина значка */
+    /* x = cx - text_w/2 - d - 8 (слева от слова) */
+    e_lsr(0, 24, 1);
+    e_sub_w_reg(0, 22, 0);
+    e_sub_w_reg(0, 0, 25);
+    e_sub_w(0, 0, 8);
+    /* y = cy - d/2 */
+    e_lsr(1, 25, 1);
+    e_sub_w_reg(1, 20, 1);
+    e_str_w(0, 31, 0x58); e_str_w(1, 31, 0x5c);
+    /* рисование: hint="", button = L1/R1 */
+    e_adrp(0, s_kbempty); e_addi(0, 0, (uint32_t)(s_kbempty & 0xFFF));
+    e_adrp(1, s_kbl1); e_addi(1, 1, (uint32_t)(s_kbl1 & 0xFFF));
+    size_t b_l1d = cb_off; cb32(0);      /* cbz w26 -> draw */
+    e_adrp(1, s_kbr1); e_addi(1, 1, (uint32_t)(s_kbr1 & 0xFFF));
+    uint64_t b_draw = cbpc();
+    e_mov(2, 27);
+    e_addi(3, 31, 0x58);
+    e_bl(A_BLITBUTTON);
+    e_ldr_x(30, 31, 0x50);
+    e_ldp_off(25, 26, 31, 6);
+    e_ldp_off(23, 24, 31, 4);
+    e_ldp_off(21, 22, 31, 2);
+    e_ldp_post(19, 20, 31, 12);
+    e_b(0x42a514ULL);
+    fix_cbz64_cave(b_notext, 0x42a550ULL, 23);
+    fix_cbz_cave(b_l1, b_have, 26);
+    fix_cbz_cave(b_l1d, b_draw, 26);
+    return va;
+}
+
+static int build_kb_tweaks(void) {
+    if (cave_len + 4096 > max_cave) return 0;
+    cb_off = cave_len;
+    while (cb_off % 8) cave[cb_off++] = 0;
+    size_t dummy = 0;
+    s_kbpref = cs_str(&dummy, "Поиск в консоли ");
+    s_kbl1 = cs_str(&dummy, "L1");
+    s_kbr1 = cs_str(&dummy, "R1");
+    s_kbempty = cs_str(&dummy, "");
+    s_kbgray = cb_data64(0x00000000FF999999ULL);
+    s_kbwhite = cb_data64(0x00000000FFFFFFFFULL);
+    s_kbblack = cb_data64(0x00000000FF000000ULL);
+    kb_title_va = build_kb_title();
+    kb_hint_va = build_kb_hintbar();
+    kb_badge_va = build_kb_badge();
+    cave_len = cb_off;
+    return 1;
+}
+
+static int patch_kb_tweaks(void) {
+    uint8_t *p1 = file_ptr(0x42ac24ULL, 4);
+    uint8_t *p2 = file_ptr(0x42a328ULL, 4);
+    uint8_t *p3 = file_ptr(0x42a510ULL, 4);
+    uint8_t *p4 = file_ptr(0x42afb8ULL, 4);
+    uint8_t *p5 = file_ptr(0x42b0ccULL, 4);
+    if (!p1 || !p2 || !p3 || !p4 || !p5) return 0;
+    if (rd32(p1) != 0xF94033E0u) return 0;
+    if (rd32(p2) != 0x97FFFC26u) return 0;
+    if (rd32(p3) != 0xB4000217u) return 0;
+    if (rd32(p4) != 0xB940E7E0u) return 0;
+    if (rd32(p5) != 0xB940E7E0u) return 0;
+    wr32(p1, enc_b(0x42ac24ULL, kb_title_va));
+    wr32(p2, enc_bl(0x42a328ULL, kb_hint_va));
+    wr32(p3, enc_b(0x42a510ULL, kb_badge_va));
+    wr32(p4, enc_b(0x42afb8ULL, 0x42b434ULL));
+    wr32(p5, enc_b(0x42b0ccULL, 0x42b408ULL));
+    return 1;
+}
+
 static int patch_console_search(void) {
     if (!cs_stub_item_va || !cs_stub_item2_va || !cs_stub_act_va || !cs_leave_hook_va || !cs_hint_hook_va || !cs_handle_hook_va || !cs_open_hook_va) return 0;
     uint8_t *p = file_ptr(0x41c910ULL, 4);
@@ -1353,6 +1613,7 @@ int main(int argc, char **argv) {
     /* ---- «Поиск игры в консоли»: пункт меню, обработчик, фильтр ---- */
 #ifdef CS_CONSOLE_SEARCH
     cs_built = build_console_search();
+    kb_built = cs_built ? build_kb_tweaks() : 0;
 #endif
 
 
@@ -1505,6 +1766,7 @@ int main(int argc, char **argv) {
     /* ---- insert ---- */
     grid_wrapped = fix_grid_wrap(code, code_len, text->addr);
     cs_patched = cs_built ? patch_console_search() : 0;
+    kb_patched = kb_built ? patch_kb_tweaks() : 0;
     if (copies == 0 && !grid_wrapped && !cs_patched) cave_len = cave_len_strings; /* кейв не понадобился */
     insert_size = align_up(cave_len, 0x10000);
     cave_ext = insert_size < (rw_page - cave_vaddr) ? insert_size : (rw_page - cave_vaddr);
@@ -1537,7 +1799,7 @@ int main(int argc, char **argv) {
 
     int missing = 0;
     for (int i = 0; i < mapnum; i++) if (!map[i].found) missing++;
-    printf("OK: %d strings, %d missing, %d adrp+add, %d label copies, grid wrap %d, console search %d, cave %zu/%llu, size %zu\n",
-           mapnum - missing, missing, total_pairs, copies, grid_wrapped, cs_patched, cave_len, (unsigned long long)max_cave, buf_len);
+    printf("OK: %d strings, %d missing, %d adrp+add, %d label copies, grid wrap %d, console search %d, kb %d, cave %zu/%llu, size %zu\n",
+           mapnum - missing, missing, total_pairs, copies, grid_wrapped, cs_patched, kb_patched, cave_len, (unsigned long long)max_cave, buf_len);
     return 0;
 }
