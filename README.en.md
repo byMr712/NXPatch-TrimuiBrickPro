@@ -8,7 +8,7 @@
 ![Patch](https://img.shields.io/badge/Patch-1.0-blue.svg)
 ![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)
 
-A patch for **NX Redux (NextUI) on the TrimUI Brick Pro** that translates the interface into Russian, replaces the boot logo and adds a few menu improvements. The patch is applied on the fly to the already installed `nextui.elf` / `settings.elf` and can be removed just as easily.
+A patch for **NX Redux on the TrimUI Brick Pro** that translates the interface into Russian, replaces the boot logo and adds a few menu improvements. The patch is applied on the fly to the already installed `nextui.elf` / `settings.elf` and can be removed just as easily.
 
 | Patcher menu | Translated game menu |
 | :---: | :---: |
@@ -43,7 +43,7 @@ A patch for **NX Redux (NextUI) on the TrimUI Brick Pro** that translates the in
    The folder name may be anything (`Ports`, `PORTS`, etc.): the scripts derive their path from their own file instead of a hard-coded `Ports (PORTS)`. The folder still has to be a console NextUI lists (normally `Ports (PORTS)`), with the `.sh` next to `.ports/nxredux-mr712/`.
 2. Insert the card into the console and power it on.
 
-> To build a ready-to-copy archive, run `build.bat` in the project root: it writes `builds/NXPatch_v1.0_for_Trimui_Brick_Pro.zip`. Unpack it into the card root — it already contains `Roms/Ports (PORTS)/…`.
+> To build a ready-to-copy archive, run `build.bat` in the project root: it writes `builds/NXPatch_v1.0_for_Trimui_Brick_Pro.zip`. The archive is flat (`NX REDUX Mr712 Patch.sh` plus `.ports/`), so unpack it **into the ports console folder** — under any name (`Ports (PORTS)`, `Ports`, ...). It must be the ports console: `.sh` is launched by its emulator; in a regular console (NES, GB, ...) the file shows up but will not start.
 3. Open **Ports** and start **NX REDUX Mr712 Patch** (or `TOOLS → NX REDUX Mr712 Patch`).
 4. Choose **Install patch** and confirm.
 5. Wait for the "Done" message and reboot the console.
