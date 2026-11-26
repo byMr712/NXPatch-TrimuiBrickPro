@@ -5,7 +5,8 @@
 # Лог: /mnt/SDCARD/Images/Bootlogo/Mr712_patch.log
 
 SD="${SDCARD_PATH:-/mnt/SDCARD}"
-PAK="$SD/Roms/Ports (PORTS)/.ports/nxredux-mr712"
+PAK="$(cd "$(dirname "$0")" 2>/dev/null && pwd)"
+[ -n "$PAK" ] || PAK="$SD/Roms/Ports (PORTS)/.ports/nxredux-mr712"
 LOG="$SD/Images/Bootlogo/Mr712_patch.log"
 BIN="$SD/.system/bin/nextui.elf"
 TOOLS="$SD/.system/paks/Tools"

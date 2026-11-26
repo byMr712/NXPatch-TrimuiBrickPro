@@ -3,7 +3,9 @@
 # Раскладка кнопок берётся из настроек системы (Button layout / Hint labels).
 
 SD="${SDCARD_PATH:-/mnt/SDCARD}"
-PAK="$SD/Roms/Ports (PORTS)/.ports/nxredux-mr712"
+HERE="$(cd "$(dirname "$0")" 2>/dev/null && pwd)"
+[ -n "$HERE" ] || HERE="$SD/Roms/Ports (PORTS)"
+PAK="$HERE/.ports/nxredux-mr712"
 LOG="$SD/Images/Bootlogo/Mr712_patch.log"
 MENU="$PAK/mr712menu"
 CFG="$SD/.userdata/shared/minuisettings.txt"
