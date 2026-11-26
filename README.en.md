@@ -22,7 +22,7 @@ A patch for **NX Redux (NextUI) on the TrimUI Brick Pro** that translates the in
 - **Dedicated patcher menu** with a description of the selected item, black "Install / Remove / Exit" screens and wrap-around navigation.
 - **Grid wrap-around**: in Tools, Consoles and Collections, pressing down on the last row moves to the first one, and up on the first row moves to the last one.
 - **Search within the console**: a game-menu item that matches the **beginning of the game title** in the current console folder (the file extension is ignored). Back from the results returns to the search prompt with the previous query; back again returns to the game list.
-- **"Continue" row at the top of a console**: the first row is the last game played in that console, with its cover; A resumes it from the save.
+- **"Continue" row at the top of a console**: the first row is the most recently played game (when it belongs to that console), with its cover; A resumes it from the save. Computed once per list, with no disk access.
 - **Version check**: if `version.txt` is not `NXRedux-v2.5.1`, the patch warns and offers to cancel (cancel is the default).
 
 ## Compatibility
