@@ -99,7 +99,7 @@ netplay теперь «ИГРА ПО СЕТИ».
 
 Структуры: `Entry{path 0, name 8, unique 0x10, type 0x18, alpha 0x1c}`;
 `Directory{path 0, name 8, entries 0x10, alphas 0x18, selected 0x8c, start 0x90, end 0x94, serial 0x98}`;
-`Array{count 0, capacity 4, items 8}`; `ResumeState.can_resume` — первый байт.
+`Array{count 0, capacity 4, items 8}`; `ResumeState{can_resume 0, should_resume 1, has_preview 2, has_boxart 3, slot_path 4}`.
 
 ## Ошибки, найденные по пути
 
@@ -115,8 +115,9 @@ netplay теперь «ИГРА ПО СЕТИ».
 
 ## Проверка
 
-- Итоговая сборка: `0acb5c877acc0490e4b269db6ee2d3e7` (2.5.1 + перевод +
-  сетка + поиск).
+- Сборка на момент проверки поиска: `0acb5c877acc0490e4b269db6ee2d3e7`
+  (2.5.1 + перевод + сетка + поиск). Текущая сборка патча и её хеш — в
+  [continue_row.md](continue_row.md).
 - `bat` → Batman (3), Battle Arena Toshinden, Battletoads; подсказки
   «НАЗАД В ПОИСК» / «ОТКРЫТЬ».
 - `inde` → IndestructoTank; добавлена подсказка Y «ПРОДОЛЖИТЬ».

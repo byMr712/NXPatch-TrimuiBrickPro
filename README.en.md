@@ -31,7 +31,7 @@ A patch for **NX Redux (NextUI) on the TrimUI Brick Pro** that translates the in
 - Firmware: **NX Redux 2.5.1** (checked through `version.txt`).
 - The patch works with the **installed** binaries: nothing is downgraded, official updates keep working.
 - Official `nextui.elf` and `settings.elf` are not part of this repository — the patch is applied to the files already present on the card.
-- The translation is version independent: strings are located by content. Code changes (grid wrap, console search) are build specific and are simply skipped on another version.
+- The translation is version independent: strings are located by content. Code changes (grid wrap, console search, the "Continue" row) are build specific and are simply skipped on another version.
 
 ## Installation
 
@@ -75,13 +75,30 @@ The compiler expands `snprintf(dst, 64, "%s", "literal")` into a fixed-length co
 
 The grid input handler contains two "stop" branches (up on the first row and down on the last row). Both are redirected to cave stubs that compute the new index and return into the common selection path. The site is found by a ten-instruction signature; on a mismatch the step is skipped.
 
+### Console search and the "Continue" row
+
+Both live in the same cave and are wired in through hooks on the list handler:
+
+- **search** — a game-menu item opens the keyboard; the matches are collected
+  into a regular `Directory`. Back from the results returns to the search
+  prompt with the previous query; back again returns to the game list.
+  Details and addresses: [docs/console_search.md](docs/console_search.md);
+- **"Continue"** — the first row of a console list: that console's newest game
+  from Recents. A launches it the same way Recents does (loading the save state
+  when there is one). Details, measurements and pitfalls:
+  [docs/continue_row.md](docs/continue_row.md).
+
+| Console search | "Continue" row |
+| :---: | :---: |
+| ![Search](images/console-search.png) | ![Continue](images/continue-row.png) |
+
 ### Patcher menu
 
 `mr712menu` is a small SDL2 application that draws pre-rendered BMP frames. The button layout and hint labels are read from `minuisettings.txt` (`buttonlayout`, `hintlabels`), so the menu follows the system settings instead of assuming an Xbox pad.
 
 ## Limitations
 
-- Code patches (grid wrap, the planned per-console search) are tied to a specific NX Redux build. After a firmware update, run the patch again: if the signature does not match, that step is skipped without any side effects (the log shows `grid wrap 0`).
+- Code patches (grid wrap, console search, the "Continue" row) are tied to a specific NX Redux build. After a firmware update, run the patch again: if the signature does not match, that step is skipped without any side effects (the log shows `grid wrap 0`, `console search 0`).
 - The translation and the artwork are version independent and apply to any suitable binary.
 - The patch does not touch saves, game lists, collections or user settings.
 
