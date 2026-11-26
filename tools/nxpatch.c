@@ -165,7 +165,9 @@ static size_t grid_up_off, grid_down_off;
  * Все адреса — из nextui.elf 2.5.1, применение защищено проверкой сигнатур. */
 static size_t cb_off;
 static size_t cs_label_off, cs_prompt_off, cs_roms_off, cs_tmpdir_off, cs_title_off;
+static size_t cs_back_off, cs_btn_b_off, cs_btn_x_off, cs_btn_a_off, cs_resume_off, cs_open_off;
 static uint64_t cs_stub_item_va, cs_stub_item2_va, cs_stub_act_va;
+static uint64_t cs_leave_hook_va, cs_hint_hook_va;
 static int cs_built, cs_patched;
 
 #define A_CTX_ADD     0x41c7b0ULL  /* addItem(items, &count, label, id) */
@@ -174,6 +176,7 @@ static int cs_built, cs_patched;
 #define A_POLL        0x432d10ULL  /* PLAT_pollInput() */
 #define A_DIR_NEW     0x4a7b00ULL  /* Directory_new(path, n) */
 #define A_ROWCOUNT    0x497370ULL  /* GameList_rowCountAt(false) */
+#define A_ISSEARCH    0x496b50ULL  /* GameList_isSearch() */
 #define A_ARRAY_PUSH  0x4ace30ULL  /* Array_push(arr, item) */
 #define A_ENTRY_FREE  0x4acea0ULL  /* Entry_free(entry) */
 #define A_ENTRY_NEW_NAMED 0x4adac0ULL /* Entry_newNamed(path,type,name) */
@@ -195,6 +198,7 @@ static int cs_built, cs_patched;
 #define G_STACK       0x4d8e80ULL  /* Array* stack */
 #define G_BGREUPLOAD  0x510428ULL
 #define G_SEARCHQ     0x510430ULL  /* char search_query[256] */
+#define G_RESUME      0x50e1d8ULL  /* ResumeState resume */
 #define G_PAD         0x50e0d0ULL
 #define L_FAUXSEARCH  0x4ae930ULL  /* FAUX_SEARCH_PATH */
 #define L_FMT_S       0x4b5588ULL  /* "%s" */
@@ -266,6 +270,10 @@ static void e_csel(int rd, int rn, int rm, int cond) {
     cb32(0x1A800000u | ((uint32_t)rm << 16) | ((uint32_t)cond << 12) | ((uint32_t)rn << 5) | (uint32_t)rd);
 }
 static void e_ret(void) { cb32(0xD65F03C0u); }
+static void e_movn(int rd, uint32_t imm16) { cb32(0x12800000u | ((imm16 & 0xFFFF) << 5) | (uint32_t)rd); }
+static void e_sub_w(int rd, int rn, uint32_t imm) { cb32(0x51000000u | ((imm & 0xFFF) << 10) | ((uint32_t)rn << 5) | (uint32_t)rd); }
+static void e_sub_reg(int rd, int rn, int rm) { cb32(0xCB000000u | ((uint32_t)rm << 16) | ((uint32_t)rn << 5) | (uint32_t)rd); }
+static void e_add_reg_shift(int rd, int rn, int rm, int shift) { cb32(0x8B000000u | ((uint32_t)rm << 16) | ((uint32_t)(shift & 0x3F) << 10) | ((uint32_t)rn << 5) | (uint32_t)rd); }
 static uint64_t cs_str(size_t *off, const char *s) {
     size_t n = strlen(s) + 1;
     while (cb_off % 8) cave[cb_off++] = 0;
@@ -328,9 +336,10 @@ static void e_mark(int n) {
     e_adrp(1, g_mark_st[n]); e_addi(1, 1, (uint32_t)(g_mark_st[n] & 0xFFF));
     e_bl(A_PUTFILE);
 }
-/* Свой поиск по консоли: штатная клавиатура (виджет) -> запрос ->
- * пустой Directory -> копии записей текущей консоли, чьё имя начинается
- * с запроса (без расширения файла) -> push/top. Оригинальный поиск не вызывается. */
+/* «Поиск игры в консоли»: своя реализация.
+ * Пункт меню -> клавиатура -> результаты (обычный Directory поверх списка).
+ * Назад в результатах -> клавиатура с прошлым запросом; отмена в ней -> список игр.
+ * Поиск идёт по началу отображаемого имени в текущей папке консоли. */
 static int build_console_search(void) {
     if (cave_len + 4096 > max_cave) return 0;
     cb_off = cave_len;
@@ -341,134 +350,255 @@ static int build_console_search(void) {
     uint64_t s_roms = cs_str(&cs_roms_off, "/mnt/SDCARD/Roms/");
     uint64_t s_tmpdir = cs_str(&cs_tmpdir_off, "/tmp/.nxsearch");
     uint64_t s_title = cs_str(&cs_title_off, "Поиск: %s");
+    uint64_t s_back = cs_str(&cs_back_off, "Назад в меню поиска");
+    uint64_t s_b = cs_str(&cs_btn_b_off, "B");
+    uint64_t s_x = cs_str(&cs_btn_x_off, "X");
+    uint64_t s_a = cs_str(&cs_btn_a_off, "A");
+    uint64_t s_resume = cs_str(&cs_resume_off, "ПРОДОЛЖИТЬ");
+    uint64_t s_open = cs_str(&cs_open_off, "ОТКРЫТЬ");
     while (cb_off % 8) cave[cb_off++] = 0;
 
-    /* ---------- поиск: x20 = Directory* консоли, кадр 0x170 ---------- */
-    uint64_t search_va = cave_vaddr + cb_off;
-    e_stp_pre(19, 20, 31, -46);          /* 0x170 */
+    /* ==================== заполнение результатов ====================
+     * x0 = Directory* консоли, x1 = Directory* результатов.
+     * Копирует записи, чьё имя начинается с search_query, и считает alphas. */
+    uint64_t fill_va = cave_vaddr + cb_off;
+    e_stp_pre(19, 20, 31, -12);          /* 0x60 */
     e_stp_off(21, 22, 31, 2);
     e_stp_off(23, 24, 31, 4);
     e_stp_off(25, 26, 31, 6);
     e_stp_off(27, 28, 31, 8);
     e_str_x(30, 31, 0x50);
-    size_t s_done = 0, s_freeq = 0;
-    e_adrp(0, G_TOP); e_ldr_x(9, 0, (uint32_t)(G_TOP & 0xFFF));
-    size_t p_notop = cb_off; cb32(0);    /* cbz x9 -> done */
-    e_mov(20, 9);                        /* x20 = консоль */
+    e_mov(19, 0);                        /* console */
+    e_mov(20, 1);                        /* dir */
+    e_adrp(0, G_SEARCHQ); e_addi(0, 0, (uint32_t)(G_SEARCHQ & 0xFFF));
+    e_bl(P_STRLEN);
+    e_mov(22, 0);                        /* qlen */
+    e_ldr_x(23, 19, 0x10);               /* console->entries */
+    e_ldr_w(24, 23, 0);                  /* count */
+    e_ldr_x(25, 23, 8);                  /* items */
+    e_ldr_x(26, 20, 0x10);               /* dir->entries */
+    e_movi(27, 0);                       /* i */
+    uint64_t f_loop = cbpc();
+    e_cmp_r(27, 24);
+    size_t f_ge = cb_off; cb32(0);       /* b.ge -> fill_done */
+    e_ldr_reg(28, 25, 27, 3);            /* e */
+    size_t f_n0 = cb_off; cb32(0);       /* cbz x28 -> f_next */
+    e_ldr_x(0, 28, 8);                   /* e->name */
+    size_t f_n1 = cb_off; cb32(0);       /* cbz x0 -> f_next */
+    e_adrp(1, G_SEARCHQ); e_addi(1, 1, (uint32_t)(G_SEARCHQ & 0xFFF));
+    e_mov(2, 22);
+    e_bl(P_STRNCASECMP);
+    size_t f_nz = cb_off; cb32(0);       /* cbnz w0 -> f_next */
+    e_ldr_x(0, 28, 0);
+    e_ldr_w(1, 28, 0x18);
+    e_ldr_x(2, 28, 8);
+    e_bl(A_ENTRY_NEW_NAMED);
+    size_t f_nc = cb_off; cb32(0);       /* cbz x0 -> f_next */
+    e_mov(21, 0);                        /* copy */
+    e_ldr_x(1, 28, 0x10);                /* unique */
+    size_t f_nu = cb_off; cb32(0);       /* cbz x1 -> f_push */
+    e_mov(0, 1);
+    e_bl(P_STRDUP);
+    e_str_x(0, 21, 0x10);
+    uint64_t f_push = cbpc();
+    e_mov(0, 26);
+    e_mov(1, 21);
+    e_bl(A_ARRAY_PUSH);
+    uint64_t f_next = cbpc();
+    e_add_w(27, 27, 1);
+    e_b(f_loop);
+    uint64_t f_done = cbpc();
+
+    /* --- alphas по первой букве имени (для L1/R1) --- */
+    e_ldr_w(24, 26, 0);                  /* arr->count */
+    e_ldr_x(25, 26, 8);                  /* arr->items */
+    e_movi(27, 0);                       /* i */
+    e_movn(6, 0);                        /* prev = -1 */
+    e_movi(7, 0);                        /* alpha index */
+    e_movi(8, 0);                        /* groups */
+    uint64_t a_loop = cbpc();
+    e_cmp_r(27, 24);
+    size_t a_ge = cb_off; cb32(0);       /* b.ge -> a_done */
+    e_ldr_reg(28, 25, 27, 3);
+    size_t a_n0 = cb_off; cb32(0);       /* cbz x28 -> a_next */
+    e_ldr_x(0, 28, 8);                   /* name */
+    size_t a_n1 = cb_off; cb32(0);       /* cbz x0 -> a_next */
+    e_ldrb(4, 0, 0);                     /* c = name[0] */
+    e_sub_w(5, 4, 0x41);                 /* c - 'A' */
+    e_cmp_i(5, 25);
+    size_t a_u = cb_off; cb32(0);        /* b.hi -> a_l1 */
+    e_add_w(4, 4, 32);                   /* tolower A-Z */
+    uint64_t a_l1 = cbpc();
+    e_cmp_i(4, 0x61);                    /* 'a' */
+    size_t a_lo = cb_off; cb32(0);       /* b.lo -> a_l2 */
+    e_cmp_i(4, 0x7a);                    /* 'z' */
+    size_t a_hi = cb_off; cb32(0);       /* b.hi -> a_l2 */
+    e_sub_w(4, 4, 0x61);
+    e_add_w(4, 4, 1);                    /* bucket = c-'a'+1 */
+    size_t a_b3 = cb_off; cb32(0);       /* b -> a_l3 */
+    uint64_t a_l2 = cbpc();
+    e_cmp_i(4, 0x7a);
+    e_movi(5, 27);
+    e_csel(4, 5, 31, 0x8 /*HI*/);        /* bucket = c>'z' ? 27 : 0 */
+    uint64_t a_l3 = cbpc();
+    e_cmp_r(4, 6);
+    size_t a_same = cb_off; cb32(0);     /* b.eq -> a_same */
+    e_cmp_i(8, 28);                      /* INT_ARRAY_MAX */
+    size_t a_full = cb_off; cb32(0);     /* b.ge -> a_no_append */
+    e_addi(9, 20, 0x1c);                 /* &alphas.items */
+    e_add_reg_shift(9, 9, 8, 2);         /* + count*4 */
+    e_str_w(27, 9, 0);                   /* items[count] = i */
+    e_mov(7, 8);                         /* alpha = count */
+    e_add_w(8, 8, 1);
+    e_str_w(8, 20, 0x18);                /* alphas.count */
+    uint64_t a_no_append = cbpc();
+    e_mov(6, 4);                         /* prev = bucket */
+    uint64_t l_same = cbpc();
+    e_str_w(7, 28, 0x1c);                /* entry->alpha */
+    uint64_t a_next = cbpc();
+    e_add_w(27, 27, 1);
+    e_b(a_loop);
+    uint64_t a_done = cbpc();
+    e_str_w(8, 20, 0x18);
+    e_ldr_x(30, 31, 0x50);
+    e_ldp_off(27, 28, 31, 8);
+    e_ldp_off(25, 26, 31, 6);
+    e_ldp_off(23, 24, 31, 4);
+    e_ldp_off(21, 22, 31, 2);
+    e_ldp_post(19, 20, 31, 12);
+    e_ret();
+    /* fixups fill */
+    fix_bcond_cave(f_ge, 0xA, f_done);
+    fix_cbz64_cave(f_n0, f_next, 28);
+    fix_cbz64_cave(f_n1, f_next, 0);
+    {   int64_t d = (int64_t)f_next - (int64_t)(cave_vaddr + f_nz);
+        wr32(cave + f_nz, 0x35000000u | (((uint32_t)((d >> 2) & 0x7FFFF)) << 5) | 0u); }
+    fix_cbz64_cave(f_nc, f_next, 0);
+    fix_cbz64_cave(f_nu, f_push, 1);
+    /* fixups alphas */
+    fix_bcond_cave(a_ge, 0xA, a_done);
+    fix_cbz64_cave(a_n0, a_next, 28);
+    fix_cbz64_cave(a_n1, a_next, 0);
+    fix_bcond_cave(a_u, 0x8, a_l1);
+    fix_bcond_cave(a_lo, 0x3, a_l2);
+    fix_bcond_cave(a_hi, 0x8, a_l2);
+    {   int64_t d = (int64_t)a_l3 - (int64_t)(cave_vaddr + a_b3);
+        wr32(cave + a_b3, 0x14000000u | (uint32_t)((d >> 2) & 0x3FFFFFF)); }
+    fix_bcond_cave(a_same, 0x0, l_same);
+    fix_bcond_cave(a_full, 0xA, a_no_append);
+
+    /* ==================== сам поиск ====================
+     * Без аргументов. Если top — результаты, режим редактирования:
+     * клавиатура с прошлым запросом, замена списка. Иначе — новый поиск.
+     * Возвращает 1 (показать/обновить) или 0 (отмена). */
+    uint64_t search_va = cave_vaddr + cb_off;
+    e_stp_pre(19, 20, 31, -46);          /* 0x170, буфер заголовка 0x60 */
+    e_stp_off(21, 22, 31, 2);
+    e_stp_off(23, 24, 31, 4);
+    e_stp_off(25, 26, 31, 6);
+    e_stp_off(27, 28, 31, 8);
+    e_str_x(30, 31, 0x50);
+    size_t s_cancel = 0, s_ret1 = 0;
+    e_bl(A_ISSEARCH);
+    e_mov(23, 0);                        /* edit = isSearch */
+    size_t p_ini = cb_off; cb32(0);      /* cbz w0 -> initial_console */
+    /* edit: консоль = stack[count-2] */
+    e_adrp(0, G_STACK); e_ldr_x(0, 0, (uint32_t)(G_STACK & 0xFFF));
+    e_ldr_w(1, 0, 0);
+    e_cmp_i(1, 2);
+    size_t p_sc = cb_off; cb32(0);       /* b.lt cancel */
+    e_ldr_x(2, 0, 8);
+    e_sub_w(1, 1, 2);
+    e_ldr_reg(20, 2, 1, 3);              /* console */
+    size_t p_cr = cb_off; cb32(0);       /* b -> console_ready */
+    uint64_t l_initial_console = cbpc();
+    e_adrp(0, G_TOP); e_ldr_x(20, 0, (uint32_t)(G_TOP & 0xFFF));
+    uint64_t l_console_ready = cbpc();
+    size_t p_ct = cb_off; cb32(0);       /* cbz x20 -> cancel */
+    /* клавиатура: initial = edit ? search_query : NULL */
     e_adrp(0, s_prompt); e_addi(0, 0, (uint32_t)(s_prompt & 0xFFF));
     e_movi(1, 0);
+    size_t p_noi = cb_off; cb32(0);      /* cbz w23 -> kbd */
+    e_adrp(1, G_SEARCHQ); e_addi(1, 1, (uint32_t)(G_SEARCHQ & 0xFFF));
+    uint64_t l_kbd = cbpc();
     e_movi(2, 1);                        /* KB_START_CANCELS */
     e_bl(A_KBD);
-    e_mov(19, 0);                        /* query */
+    e_mov(21, 0);                        /* query */
     e_bl(A_BGREUPLOAD);
     e_bl(A_POLL);
     e_bl(A_PADRESET);
-    size_t p_noq = cb_off; cb32(0);      /* cbz x19 -> done */
-    e_ldrb(0, 19, 0);
-    size_t p_empty = cb_off; cb32(0);    /* cbz w0 -> freeq */
+    size_t p_nq = cb_off; cb32(0);       /* cbz x21 -> cancel */
+    e_ldrb(0, 21, 0);
+    size_t p_eq0 = cb_off; cb32(0);      /* cbz w0 -> cancel */
+    /* search_query = query */
     e_adrp(0, G_SEARCHQ); e_addi(0, 0, (uint32_t)(G_SEARCHQ & 0xFFF));
     e_movi(1, 0x100);
     e_adrp(2, L_FMT_S); e_addi(2, 2, (uint32_t)(L_FMT_S & 0xFFF));
-    e_mov(3, 19);
+    e_mov(3, 21);
     e_bl(P_SNPRINTF);
-    e_mov(0, 19); e_bl(P_FREE);
-    /* пустой Directory: только серийник/структура, entries пустой */
-    e_adrp(0, s_tmpdir); e_addi(0, 0, (uint32_t)(s_tmpdir & 0xFFF));
-    e_movi(1, 0);
-    e_bl(A_DIR_NEW);
-    e_mov(19, 0);                        /* dir */
-    /* гарантированно пустой список: старый массив освобождаем */
-    e_ldr_x(26, 19, 0x10);
-    e_bl(A_ARRAY_NEW);
-    e_str_x(0, 19, 0x10);
-    e_mov(0, 26);
-    e_bl(A_ENTRYARRAY_FREE);
-    /* dir->path = "/mnt/SDCARD/.search" */
-    e_ldr_x(0, 19, 0); e_bl(P_FREE);
-    e_adrp(0, L_FAUXSEARCH); e_addi(0, 0, (uint32_t)(L_FAUXSEARCH & 0xFFF));
-    e_bl(P_STRDUP);
-    e_str_x(0, 19, 0);
-    /* заголовок "Поиск: q" */
+    e_mov(0, 21); e_bl(P_FREE);
+    /* заголовок "Поиск: q" в буфер на стеке */
     e_addi(0, 31, 0x60);
     e_movi(1, 0x100);
     e_adrp(2, s_title); e_addi(2, 2, (uint32_t)(s_title & 0xFFF));
     e_adrp(3, G_SEARCHQ); e_addi(3, 3, (uint32_t)(G_SEARCHQ & 0xFFF));
     e_bl(P_SNPRINTF);
+    /* edit -> top, initial -> новый Directory */
+    size_t p_edit = cb_off; cb32(0);     /* cbnz w23 -> edit_build */
+    e_adrp(0, s_tmpdir); e_addi(0, 0, (uint32_t)(s_tmpdir & 0xFFF));
+    e_movi(1, 0);
+    e_bl(A_DIR_NEW);
+    e_mov(19, 0);
+    size_t p_dn = cb_off; cb32(0);       /* cbz x19 -> cancel */
+    e_ldr_x(0, 19, 0); e_bl(P_FREE);
+    e_adrp(0, L_FAUXSEARCH); e_addi(0, 0, (uint32_t)(L_FAUXSEARCH & 0xFFF));
+    e_bl(P_STRDUP);
+    e_str_x(0, 19, 0);
+    size_t p_common = cb_off; cb32(0);   /* b -> common */
+    uint64_t l_edit_build = cbpc();
+    e_adrp(0, G_TOP); e_ldr_x(19, 0, (uint32_t)(G_TOP & 0xFFF));
+    size_t p_et = cb_off; cb32(0);       /* cbz x19 -> cancel */
+    uint64_t l_common = cbpc();
+    /* общее: заменить entries и name */
+    e_ldr_x(0, 19, 0x10); e_bl(A_ENTRYARRAY_FREE);
+    e_bl(A_ARRAY_NEW);
+    e_str_x(0, 19, 0x10);
     e_ldr_x(0, 19, 8); e_bl(P_FREE);
     e_addi(0, 31, 0x60);
     e_bl(P_STRDUP);
     e_str_x(0, 19, 8);
-    /* qlen = strlen(search_query) */
-    e_adrp(0, G_SEARCHQ); e_addi(0, 0, (uint32_t)(G_SEARCHQ & 0xFFF));
-    e_bl(P_STRLEN);
-    e_mov(22, 0);                        /* qlen */
-    /* cent = console->entries */
-    e_ldr_x(23, 20, 0x10);
-    e_ldr_w(24, 23, 0);                  /* count */
-    e_ldr_x(25, 23, 8);                  /* items */
-    e_ldr_x(26, 19, 0x10);               /* arr = dir->entries */
-    e_movi(27, 0);                       /* i */
-    size_t f_loop = cbpc();
-    e_cmp_r(27, 24);
-    size_t p_ge = cb_off; cb32(0);       /* b.ge -> done_loop */
-    e_ldr_reg(28, 25, 27, 3);            /* e */
-    size_t p_n0 = cb_off; cb32(0);       /* cbz x28 -> next */
-    e_ldr_x(0, 28, 8);                   /* e->name */
-    size_t p_n1 = cb_off; cb32(0);       /* cbz x0 -> next */
-    e_adrp(1, G_SEARCHQ); e_addi(1, 1, (uint32_t)(G_SEARCHQ & 0xFFF));
-    e_mov(2, 22);
-    e_bl(P_STRNCASECMP);
-    size_t p_nz = cb_off; cb32(0);       /* cbnz w0 -> next */
-    /* copy = Entry_newNamed(e->path, e->type, e->name) */
-    e_ldr_x(0, 28, 0);
-    e_ldr_w(1, 28, 0x18);
-    e_ldr_x(2, 28, 8);
-    e_bl(A_ENTRY_NEW_NAMED);
-    size_t p_nc = cb_off; cb32(0);       /* cbz x0 -> next */
-    e_mov(21, 0);                        /* copy */
-    e_ldr_x(1, 28, 0x10);                /* e->unique */
-    size_t p_nu = cb_off; cb32(0);       /* cbz x1 -> push */
-    e_mov(0, 1);
-    e_bl(P_STRDUP);
-    e_str_x(0, 21, 0x10);
-    size_t p_push = cbpc();
-    e_mov(0, 26);
-    e_mov(1, 21);
-    e_bl(A_ARRAY_PUSH);
-    size_t p_next = cbpc();
-    e_add_w(27, 27, 1);
-    e_b(f_loop);
-    s_done = cbpc();
-    /* alphas.count=0, selected=0 */
-    e_str_w(31, 19, 0x18);
-    e_str_w(31, 19, 0x8c);
-    /* end = min(count, max(rowCount,1)); start=0 */
-    e_movi(0, 0);
-    e_bl(A_ROWCOUNT);
-    e_ldr_w(2, 26, 0);
+    /* заполнить */
+    e_mov(0, 20); e_mov(1, 19);
+    e_bl(fill_va);
+    e_str_w(31, 19, 0x8c);               /* selected = 0 */
+    e_movi(0, 0); e_bl(A_ROWCOUNT);
+    e_ldr_x(1, 19, 0x10); e_ldr_w(2, 1, 0);
     e_movi(3, 1);
     e_cmp_i(0, 0);
     e_csel(0, 0, 3, 0xC /*GT*/);
     e_cmp_r(0, 2);
     e_csel(0, 0, 2, 0xD /*LE*/);
-    e_stp_w_off(31, 0, 19, 0x90);
-    /* push/top */
+    e_stp_w_off(31, 0, 19, 0x90);        /* start=0, end */
+    /* initial: push + top */
+    size_t p_push = cb_off; cb32(0);     /* cbnz w23 -> pushed (edit не пушит) */
     e_adrp(0, G_STACK); e_ldr_x(0, 0, (uint32_t)(G_STACK & 0xFFF));
     e_mov(1, 19);
     e_bl(A_ARRAY_PUSH);
     e_adrp(0, G_TOP); e_str_x(19, 0, (uint32_t)(G_TOP & 0xFFF));
-    e_movi(0, 1);                        /* LAYER_SCROLLTEXT */
-    e_bl(0x4117d0ULL);
-    e_bl(0x40c6f0ULL);
-    e_ldr_w(2, 26, 0);
+    uint64_t l_pushed = cbpc();
+    e_movi(0, 1); e_bl(0x4117d0);        /* LAYER_SCROLLTEXT */
+    e_bl(0x40c6f0);                      /* ScrollText_clear */
+    e_ldr_x(1, 19, 0x10); e_ldr_w(2, 1, 0);
     e_cmp_i(2, 0);
-    size_t p_nosel = cb_off; cb32(0);    /* b.le -> ret */
-    e_ldr_x(0, 26, 8);
+    size_t p_nosel = cb_off; cb32(0);    /* b.le -> ret1 */
+    e_ldr_x(0, 1, 8);
     e_ldr_x(0, 0, 0);
-    e_bl(0x4a6200ULL);                   /* readyResume(items[0]) */
-    size_t p_end = cb_off; cb32(0);      /* b -> ret */
-    s_freeq = cbpc();
-    e_mov(0, 19); e_bl(P_FREE);
+    e_bl(0x4a6200);                      /* readyResume(items[0]) */
+    s_ret1 = cbpc();
+    e_movi(0, 1);
+    size_t p_ret = cb_off; cb32(0);      /* b -> ret */
+    s_cancel = cbpc();
+    e_movi(0, 0);
     uint64_t s_ret = cbpc();
     e_ldr_x(30, 31, 0x50);
     e_ldp_off(27, 28, 31, 8);
@@ -477,26 +607,115 @@ static int build_console_search(void) {
     e_ldp_off(21, 22, 31, 2);
     e_ldp_post(19, 20, 31, 46);
     e_ret();
-    /* fixups */
-    fix_cbz64_cave(p_notop, s_ret, 9);
-    fix_cbz64_cave(p_noq, s_ret, 19);
-    fix_cbz_cave(p_empty, s_freeq, 0);
-    fix_bcond_cave(p_ge, 0xA /*GE*/, s_done);
-    fix_cbz64_cave(p_n0, p_next, 28);
-    fix_cbz64_cave(p_n1, p_next, 0);
-    {   /* cbnz w0 -> next */
-        int64_t d = (int64_t)p_next - (int64_t)(cave_vaddr + p_nz);
-        wr32(cave + p_nz, 0x35000000u | (((uint32_t)((d >> 2) & 0x7FFFF)) << 5) | 0u);
-    }
-    fix_cbz64_cave(p_nc, p_next, 0);
-    fix_cbz64_cave(p_nu, p_push, 1);
-    fix_bcond_cave(p_nosel, 0xD /*LE*/, s_ret);
-    {   /* b -> ret */
-        int64_t d = (int64_t)s_ret - (int64_t)(cave_vaddr + p_end);
-        wr32(cave + p_end, 0x14000000u | (uint32_t)((d >> 2) & 0x3FFFFFF));
-    }
+    /* fixups search */
+    fix_cbz_cave(p_ini, l_initial_console, 0);
+    fix_bcond_cave(p_sc, 0xB /*LT*/, s_cancel);
+    {   int64_t d = (int64_t)l_console_ready - (int64_t)(cave_vaddr + p_cr);
+        wr32(cave + p_cr, 0x14000000u | (uint32_t)((d >> 2) & 0x3FFFFFF)); }
+    fix_cbz64_cave(p_ct, s_cancel, 20);
+    fix_cbz_cave(p_noi, l_kbd, 23);
+    fix_cbz64_cave(p_nq, s_cancel, 21);
+    fix_cbz_cave(p_eq0, s_cancel, 0);
+    {   int64_t d = (int64_t)l_edit_build - (int64_t)(cave_vaddr + p_edit);
+        wr32(cave + p_edit, 0x35000000u | (((uint32_t)((d >> 2) & 0x7FFFF)) << 5) | 23u); }
+    {   int64_t d = (int64_t)l_common - (int64_t)(cave_vaddr + p_common);
+        wr32(cave + p_common, 0x14000000u | (uint32_t)((d >> 2) & 0x3FFFFFF)); }
+    fix_cbz64_cave(p_et, s_cancel, 19);
+    fix_cbz64_cave(p_dn, s_cancel, 19);
+    {   int64_t d = (int64_t)l_pushed - (int64_t)(cave_vaddr + p_push);
+        wr32(cave + p_push, 0x35000000u | (((uint32_t)((d >> 2) & 0x7FFFF)) << 5) | 23u); }
+    fix_bcond_cave(p_nosel, 0xD, s_ret1);
+    {   int64_t d = (int64_t)s_ret - (int64_t)(cave_vaddr + p_ret);
+        wr32(cave + p_ret, 0x14000000u | (uint32_t)((d >> 2) & 0x3FFFFFF)); }
 
-    /* ---------- обработчик id 42 ---------- */
+    /* ==================== leaveList: назад в поиск ====================
+     * Если top — результаты, открыть клавиатуру (прошлый запрос).
+     * Подтвердили — остаёмся на обновлённых результатах; отмена — выходим. */
+    cs_leave_hook_va = cave_vaddr + cb_off;
+    e_stp_pre(19, 20, 31, -8);           /* 0x40 */
+    e_stp_off(0, 1, 31, 2);              /* 0x10 */
+    e_stp_off(2, 3, 31, 4);              /* 0x20 */
+    e_stp_off(29, 30, 31, 6);            /* 0x30 */
+    e_bl(A_ISSEARCH);
+    size_t lv_orig = 0;
+    size_t lv_no = cb_off; cb32(0);      /* cbz w0 -> leave_orig */
+    e_bl(search_va);
+    size_t lv_stay = cb_off; cb32(0);    /* cbz w0 -> leave_orig */
+    e_ldp_off(2, 3, 31, 4);
+    e_ldp_off(0, 1, 31, 2);
+    e_ldp_off(29, 30, 31, 6);
+    e_ldp_post(19, 20, 31, 8);
+    e_ret();
+    lv_orig = cbpc();
+    e_ldp_off(2, 3, 31, 4);
+    e_ldp_off(0, 1, 31, 2);
+    e_ldp_off(29, 30, 31, 6);
+    e_ldp_post(19, 20, 31, 8);
+    e_stp_pre(19, 20, 31, -10);          /* оригинальный пролог 0x50 */
+    e_b(0x416604ULL);
+    fix_cbz_cave(lv_no, lv_orig, 0);
+    fix_cbz_cave(lv_stay, lv_orig, 0);
+
+    /* ==================== подсказки на результатах ====================
+     * B «Назад в меню поиска», X «Продолжить» (если есть), A «Открыть».
+     * Только для renderHints (0x4993f0..0x499898); остальные экраны не трогаем. */
+    cs_hint_hook_va = cave_vaddr + cb_off;
+    e_stp_pre(19, 20, 31, -8);           /* 0x40 */
+    e_stp_off(0, 1, 31, 2);
+    e_stp_off(2, 3, 31, 4);
+    e_stp_off(29, 30, 31, 6);
+    e_mov(19, 1);                        /* pairs */
+    e_adrp(9, 0x4993f0ULL); e_addi(9, 9, 0x3f0);
+    e_sub_reg(9, 30, 9);
+    e_cmp_i(9, 0x4a8);
+    size_t h_hi = cb_off; cb32(0);       /* b.hi -> pass */
+    e_bl(A_ISSEARCH);
+    size_t h_no = cb_off; cb32(0);       /* cbz w0 -> pass */
+    /* B + назад */
+    e_adrp(0, s_b); e_addi(0, 0, (uint32_t)(s_b & 0xFFF));
+    e_str_x(0, 19, 0);
+    e_adrp(0, s_back); e_addi(0, 0, (uint32_t)(s_back & 0xFFF));
+    e_str_x(0, 19, 8);
+    e_addi(9, 19, 0x10);
+    /* X + Продолжить: только если в результатах есть строки и can_resume */
+    e_adrp(0, G_TOP); e_ldr_x(0, 0, (uint32_t)(G_TOP & 0xFFF));
+    size_t h_nt = cb_off; cb32(0);       /* cbz x0 -> no_resume */
+    e_ldr_x(0, 0, 0x10);                 /* entries */
+    size_t h_ne = cb_off; cb32(0);       /* cbz x0 -> no_resume */
+    e_ldr_w(0, 0, 0);                    /* count */
+    size_t h_nc = cb_off; cb32(0);       /* cbz w0 -> no_resume */
+    e_adrp(0, G_RESUME); e_ldrb(0, 0, (uint32_t)(G_RESUME & 0xFFF));
+    size_t h_ny = cb_off; cb32(0);       /* cbz w0 -> no_resume */
+    e_adrp(0, s_x); e_addi(0, 0, (uint32_t)(s_x & 0xFFF));
+    e_str_x(0, 9, 0);
+    e_adrp(0, s_resume); e_addi(0, 0, (uint32_t)(s_resume & 0xFFF));
+    e_str_x(0, 9, 8);
+    e_addi(9, 9, 0x10);
+    uint64_t h_nores = cbpc();
+    /* A + Открыть */
+    e_adrp(0, s_a); e_addi(0, 0, (uint32_t)(s_a & 0xFFF));
+    e_str_x(0, 9, 0);
+    e_adrp(0, s_open); e_addi(0, 0, (uint32_t)(s_open & 0xFFF));
+    e_str_x(0, 9, 8);
+    e_addi(9, 9, 0x10);
+    e_str_x(31, 9, 0);
+    e_movi(0, 24);
+    e_str_x(0, 31, 0x28);                /* left = 24 (saved x3) */
+    uint64_t h_pass = cbpc();
+    e_ldp_off(2, 3, 31, 4);
+    e_ldp_off(0, 1, 31, 2);
+    e_ldp_off(29, 30, 31, 6);
+    e_ldp_post(19, 20, 31, 8);
+    cb32(0xD10843FFu);                   /* sub sp,sp,#0x210 */
+    e_b(0x4293c4ULL);
+    fix_bcond_cave(h_hi, 0x8 /*HI*/, h_pass);
+    fix_cbz_cave(h_no, h_pass, 0);
+    fix_cbz64_cave(h_nt, h_nores, 0);
+    fix_cbz64_cave(h_ne, h_nores, 0);
+    fix_cbz_cave(h_nc, h_nores, 0);
+    fix_cbz_cave(h_ny, h_nores, 0);
+
+    /* ==================== обработчик id 42 ==================== */
     cs_stub_act_va = cave_vaddr + cb_off;
     e_cmp_i(0, 42);
     size_t p_ne = cb_off; cb32(0);
@@ -505,45 +724,42 @@ static int build_console_search(void) {
     e_ldp_post(29, 30, 31, 2);
     e_ret();
     uint64_t l_orig = cbpc();
-    e_stp_pre(19, 20, 31, -16);          /* исходная первая инструкция */
+    e_stp_pre(19, 20, 31, -16);
     e_b(0x49c334ULL);
-    fix_bcond_cave(p_ne, 0x1 /*NE*/, l_orig);
+    fix_bcond_cave(p_ne, 0x1, l_orig);
 
-    /* ---------- пункт меню: только внутри Roms/<консоль> ---------- */
+    /* ==================== пункт меню ==================== */
     cs_stub_item_va = cave_vaddr + cb_off;
     e_adrp(0, G_TOP); e_ldr_x(0, 0, (uint32_t)(G_TOP & 0xFFF));
-    size_t g1 = cb_off; cb32(0);         /* cbz x0 -> skip */
+    size_t g1 = cb_off; cb32(0);
     e_ldr_x(0, 0, 0);
-    size_t g2 = cb_off; cb32(0);         /* cbz x0 -> skip */
+    size_t g2 = cb_off; cb32(0);
     e_adrp(1, s_roms); e_addi(1, 1, (uint32_t)(s_roms & 0xFFF));
     e_movi(2, 17);
     e_bl(P_STRNCMP);
-    size_t g3 = cb_off; cb32(0);         /* cbnz w0 -> skip */
-    e_ldr_w(0, 19, 0x18);                /* entry->type */
-    e_cmp_i(0, 2);                       /* ENTRY_ROM */
+    size_t g3 = cb_off; cb32(0);
+    e_ldr_w(0, 19, 0x18);
+    e_cmp_i(0, 2);
     size_t p_eq = cb_off; cb32(0);
     e_mov(0, 19);
     e_bl(A_ENTRY_FOLDER);
     size_t p_cbz = cb_off; cb32(0);
     uint64_t l_add = cbpc();
-    e_addi(0, 31, 0x240);                /* items */
-    e_addi(1, 31, 0x3c);                 /* &count */
+    e_addi(0, 31, 0x240);
+    e_addi(1, 31, 0x3c);
     e_adrp(2, s_label); e_addi(2, 2, (uint32_t)(s_label & 0xFFF));
     e_movi(3, 42);
     e_bl(A_CTX_ADD);
     uint64_t l_skip = cbpc();
     e_ldr_w(19, 31, 0x3c);
     e_b(0x41c914ULL);
-    fix_bcond_cave(p_eq, 0x0 /*EQ*/, l_add);
+    fix_bcond_cave(p_eq, 0x0, l_add);
     fix_cbz_cave(p_cbz, l_skip, 0);
     fix_cbz64_cave(g1, l_skip, 0);
     fix_cbz64_cave(g2, l_skip, 0);
-    {   /* cbnz w0 -> skip */
-        int64_t d = (int64_t)l_skip - (int64_t)(cave_vaddr + g3);
-        wr32(cave + g3, 0x35000000u | (((uint32_t)((d >> 2) & 0x7FFFF)) << 5) | 0u);
-    }
+    {   int64_t d = (int64_t)l_skip - (int64_t)(cave_vaddr + g3);
+        wr32(cave + g3, 0x35000000u | (((uint32_t)((d >> 2) & 0x7FFFF)) << 5) | 0u); }
 
-    /* ---------- пункт меню: инлайн-копия в GameList_handleInput ---------- */
     cs_stub_item2_va = cave_vaddr + cb_off;
     e_adrp(0, G_TOP); e_ldr_x(0, 0, (uint32_t)(G_TOP & 0xFFF));
     size_t h1 = cb_off; cb32(0);
@@ -572,10 +788,8 @@ static int build_console_search(void) {
     fix_cbz_cave(q_cbz, q_skip, 0);
     fix_cbz64_cave(h1, q_skip, 0);
     fix_cbz64_cave(h2, q_skip, 0);
-    {   /* cbnz w0 -> skip */
-        int64_t d = (int64_t)q_skip - (int64_t)(cave_vaddr + h3);
-        wr32(cave + h3, 0x35000000u | (((uint32_t)((d >> 2) & 0x7FFFF)) << 5) | 0u);
-    }
+    {   int64_t d = (int64_t)q_skip - (int64_t)(cave_vaddr + h3);
+        wr32(cave + h3, 0x35000000u | (((uint32_t)((d >> 2) & 0x7FFFF)) << 5) | 0u); }
 
     cave_len = cb_off;
     return 1;
@@ -583,25 +797,25 @@ static int build_console_search(void) {
 
 
 static int patch_console_search(void) {
-    if (!cs_stub_item_va || !cs_stub_act_va) return 0;
+    if (!cs_stub_item_va || !cs_stub_item2_va || !cs_stub_act_va || !cs_leave_hook_va || !cs_hint_hook_va) return 0;
     uint8_t *p = file_ptr(0x41c910ULL, 4);
     uint8_t *q = file_ptr(0x49c330ULL, 4);
-    if (!p || !q) return 0;
-    if (rd32(p) != 0xB9403FF3u) return 0; /* ldr w19,[sp,#0x3c] */
     uint8_t *r = file_ptr(0x41e3b8ULL, 4);
-    int patched2 = 0;
-    if (r && rd32(r) == 0xB940D3E1u && cs_stub_item2_va) { /* ldr w1,[sp,#0xd0] */
-        wr32(r, enc_b(0x41e3b8ULL, cs_stub_item2_va));
-        patched2 = 1;
-    }
-    (void)patched2;
+    uint8_t *lv = file_ptr(0x416600ULL, 4);
+    uint8_t *hb = file_ptr(0x4293c0ULL, 4);
+    if (!p || !q || !r || !lv || !hb) return 0;
+    if (rd32(p) != 0xB9403FF3u) return 0; /* ldr w19,[sp,#0x3c] */
+    if (rd32(r) != 0xB940D3E1u) return 0; /* ldr w1,[sp,#0xd0] */
     if (rd32(q) != 0xA9B853F3u) return 0; /* stp x19,x20,[sp,#-0x80]! */
+    if (rd32(lv) != 0xA9BB53F3u) return 0; /* stp x19,x20,[sp,#-0x50]! */
+    if (rd32(hb) != 0xD10843FFu) return 0; /* sub sp,sp,#0x210 */
     wr32(p, enc_b(0x41c910ULL, cs_stub_item_va));
+    wr32(r, enc_b(0x41e3b8ULL, cs_stub_item2_va));
     wr32(q, enc_b(0x49c330ULL, cs_stub_act_va));
+    wr32(lv, enc_b(0x416600ULL, cs_leave_hook_va));
+    wr32(hb, enc_b(0x4293c0ULL, cs_hint_hook_va));
     return 1;
 }
-
-
 
 /*
  * Компилятор развернул addItem(..., "литерал", id) в копию фиксированной длины
