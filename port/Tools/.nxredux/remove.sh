@@ -4,7 +4,7 @@
 
 SD="${SDCARD_PATH:-/mnt/SDCARD}"
 PAK="$(cd "$(dirname "$0")" 2>/dev/null && pwd)"
-[ -n "$PAK" ] || PAK="$SD/Tools/NX Redux Patch.pak"
+[ -n "$PAK" ] || PAK="$SD/Tools/.nxredux"
 LOG="$SD/Images/Bootlogo/Mr712_patch.log"
 BIN="$SD/.system/bin/nextui.elf"
 MINARCH="$SD/.system/bin/minarch.elf"
@@ -14,6 +14,7 @@ SETPAK="$TOOLS/ Настройки.pak"
 SETELF="$SETPAK/settings.elf"
 LOGO_DIR="$SETPAK/bootlogo/brick"
 DEV="/dev/mmcblk0p1"
+PATCHER="$PAK/nxpatch"
 
 log() { echo "$(date '+%Y-%m-%d %H:%M:%S') $*" >> "$LOG"; }
 
@@ -33,9 +34,12 @@ if [ -d "$OLDPAK" ] && [ "$OLDPAK" != "$PAK" ]; then
 	log "старая установка в «Портах» удалена"
 fi
 
-restore() { # $1 = current, $2 = .before, $3 = .orig
+restore() { # $1 = current, $2 = .before, $3 = .orig, $4 = keep backup
 	if [ -f "$2" ]; then
-		cp "$2" "$1" && sync && rm -f "$2" && { log "восстановлен $(basename "$1") из $(basename "$2")"; return 0; }
+		cp "$2" "$1" && sync
+		[ "$4" = "1" ] || rm -f "$2"
+		log "восстановлен $(basename "$1") из $(basename "$2")"
+		return 0
 	fi
 	if grep -q 'Mr712RU' "$1" 2>/dev/null; then
 		if [ -f "$3" ]; then
@@ -49,7 +53,21 @@ restore() { # $1 = current, $2 = .before, $3 = .orig
 
 restore "$BIN" "$PAK/nextui.elf.before" "$PAK/nextui.elf.orig"
 if [ -f "$SETELF" ]; then
-	restore "$SETELF" "$PAK/settings.elf.before" "$PAK/settings.elf.orig"
+	# settings.elf.before не удаляем: из него install.sh собирает перевод заново
+	restore "$SETELF" "$PAK/settings.elf.before" "$PAK/settings.elf.orig" 1
+	# пункт «NX Redux Patch» в настройках остаётся и после снятия перевода
+	if ! grep -q 'Mr712MENU' "$SETELF" 2>/dev/null; then
+		chmod +x "$PATCHER" 2>/dev/null
+		if "$PATCHER" "$SETELF" /tmp/nx_se.elf --settings-entry >> "$LOG" 2>&1; then
+			if cp /tmp/nx_se.elf "$SETELF.new" && mv -f "$SETELF.new" "$SETELF"; then
+				sync
+				log "пункт NX Redux Patch оставлен в настройках"
+			fi
+		else
+			log "ВНИМАНИЕ: пункт в настройках не добавлен (rc=$?)"
+		fi
+		rm -f /tmp/nx_se.elf "$SETELF.new"
+	fi
 fi
 if [ -f "$MINARCH" ]; then
 	restore "$MINARCH" "$PAK/minarch.elf.before" "$PAK/minarch.elf.orig"

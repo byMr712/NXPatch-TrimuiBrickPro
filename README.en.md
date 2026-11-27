@@ -22,6 +22,7 @@ A patch for **NX Redux on the TrimUI Brick Pro** that translates the interface i
 - Search within a specific console's game list: in a game list press **MENU** and choose **"Поиск игр по консоли"**.
 - Continue where you left off on each console. The first row in a game list is the game you played last on that console.
 - The Tools list scrolls through the top and bottom edges (wrap-around).
+- The patcher is an **NX Redux Patch** row at the very bottom of **Settings** — start, install and remove from there; the Tools shortcut disappears after the first run.
 
 ## Screenshots
 
@@ -65,6 +66,10 @@ The Tools, Consoles and Collections grids wrap: down on the last row goes to the
 | :---: | :---: |
 | ![Settings](images/settings-ru.webp) | ![Layouts](images/settings-layouts.webp) |
 
+The patcher sits at the very bottom of **Settings** — installing and removing the translation starts there:
+
+![The NX Redux Patch row in Settings](images/settings-entry.webp)
+
 ### Boot logo and patcher
 
 | Boot logo | Patcher menu |
@@ -79,31 +84,32 @@ The Tools, Consoles and Collections grids wrap: down on the last row goes to the
 
 ## Installation
 
-1. Extract the [downloaded archive](https://github.com/byMr712/NXPatch-TrimuiBrickPro/releases) into the card root — it creates:
+1. Extract the [downloaded archive](https://github.com/byMr712/NXPatch-TrimuiBrickPro/releases) into the card root — it creates two folders:
    ```
-   Tools/NX Redux Patch.pak/
-   ├── launch.sh
-   ├── install.sh
-   └── ...
+   Tools/NX Redux Patch.pak/   the shortcut for the first run
+   Tools/.nxredux/             the patcher itself
    ```
 2. Insert the card into the console and power it on.
-3. Open **Tools** and start **NX Redux Patch**.
-4. Choose **Install patch** and confirm.
-5. Wait for "Done" and reboot.
+3. Open **Tools → NX Redux Patch**.
+4. The patcher adds an **NX Redux Patch** row at the very bottom of **Settings** and removes its Tools shortcut.
+5. Choose **Install patch** and confirm.
+6. Wait for "Done" and reboot.
+
+From then on the patcher starts from **Settings** (the bottom row). The row stays after removing the translation, so the patch can be reinstalled at any time.
 
 > In Simple Mode the Tools tab is hidden — turn Simple Mode off first.
+> A firmware update replaces the settings app and the row disappears: extract the archive again and the Tools shortcut comes back.
 > If the previous Ports-based version is still on the card, its files are cleaned up on the first install — the backups are carried over into the pak.
 
 Safety: the first run stores `nextui.elf.before`, `settings.elf.before` and `minarch.elf.before`; the rollback uses them.
 
 ## Removal
 
-1. Open **Tools → NX Redux Patch**.
+1. Open **Settings** and pick **NX Redux Patch** at the bottom.
 2. Choose **Remove patch**.
 3. Reboot.
 
-The official `nextui.elf`, `settings.elf` and `minarch.elf` are restored, the original boot logo and the Settings folder name are returned. Logos added to the Settings list are kept.
-
+The official `nextui.elf`, `settings.elf` and `minarch.elf` are restored, the original boot logo and the Settings folder name are returned. Logos added to the Settings list are kept, and so is the **NX Redux Patch** row.
 
 ## How It Works (For Developers)
 
@@ -168,7 +174,7 @@ Screenshots of the keyboard and results are in the [Screenshots](#screenshots) s
 ## Repository Layout
 
 ```
-port/    ready-to-use set for the SD card: Tools/NX Redux Patch.pak
+port/    ready-to-use set for the SD card: Tools/NX Redux Patch.pak + Tools/.nxredux
 tools/   sources: nxpatch.c, mr712menu.c, translation tables, helper scripts
 docs/    technical notes and plans
 images/  screenshots used by the READMEs

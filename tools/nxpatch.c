@@ -15,6 +15,29 @@
 #define MARKER "Mr712RU"
 #define MARKER_LEN 16
 
+/* ---- пункт «NX Redux Patch» в настройках приставки (settings.elf v2.5.1) ----
+ * В main() сразу после build_menu_tree() в main_items дописывается кнопка,
+ * которая запускает патчер. Адреса зашиты под NXRedux-v2.5.1 и проверяются
+ * по стоку: если в точке вызова не bl build_menu_tree, патч пропускается. */
+#define SE_MARK        "Mr712MENU"
+#define SE_MARK_LEN    16
+#define SE_CALL_VA     0x406b3cULL  /* bl build_menu_tree в main() */
+#define SE_CALL_WORD   0x9400d2e9u  /* этот bl в стоке */
+#define SE_BUILD_VA    0x43b6e0ULL  /* build_menu_tree() */
+#define SE_MAINPAGE    0x4b9c48ULL  /* static SettingsPage main_page */
+#define SE_PAGE_ITEMS  8            /* SettingsPage.items */
+#define SE_PAGE_COUNT  16           /* SettingsPage.item_count */
+#define SE_PAGE_MAX    60           /* SettingsPage.max_items */
+#define SE_ITEM_SIZE   400          /* sizeof(SettingItem) */
+#define SE_ITEM_TYPE   16           /* SettingItem.type */
+#define SE_ITEM_VIS    20           /* SettingItem.visible */
+#define SE_ITEM_PRESS  80           /* SettingItem.on_press */
+#define SE_MAX_ITEMS   18           /* MAX_MAIN_ITEMS: дальше .bss чужой */
+#define SE_SYSTEM_PLT  0x4053a0ULL  /* system@plt */
+#define SE_EXIT_PLT    0x404e10ULL  /* _exit@plt */
+#define SE_RX_END0     0x4531f8ULL  /* конец RX-сегмента в стоке: дальше только наш кейв */
+#define SE_CMD         "sh /mnt/SDCARD/Tools/.nxredux/launch.sh"
+
 typedef struct {
     uint32_t type, flags;
     uint64_t off, vaddr, paddr, filesz, memsz, align;
@@ -1774,15 +1797,146 @@ static void unescape(char *s) {
     *d = 0;
 }
 
+/* ================= «NX Redux Patch» в настройках ================= */
+
+static void e_movz_x(int rd, uint32_t imm16) { cb32(0xD2800000u | ((imm16 & 0xFFFF) << 5) | (uint32_t)rd); }
+static void e_movk_x(int rd, uint32_t imm16, int hw) {
+    cb32(0xF2800000u | ((uint32_t)(hw & 3) << 21) | ((imm16 & 0xFFFF) << 5) | (uint32_t)rd);
+}
+static void e_madd(int rd, int rn, int rm, int ra) {
+    cb32(0x9B000000u | ((uint32_t)rm << 16) | ((uint32_t)ra << 10) | ((uint32_t)rn << 5) | (uint32_t)rd);
+}
+static void e_ld64(int rd, uint64_t v) {
+    e_movz_x(rd, (uint32_t)(v & 0xFFFF));
+    e_movk_x(rd, (uint32_t)((v >> 16) & 0xFFFF), 1);
+    if (v >> 32) e_movk_x(rd, (uint32_t)((v >> 32) & 0xFFFF), 2);
+    if (v >> 48) e_movk_x(rd, (uint32_t)((v >> 48) & 0xFFFF), 3);
+}
+
+static uint64_t se_stub_va, se_cb_va;
+
+/* Дописывает в текущий кейв: маркер, строки, колбэк (system + _exit) и заглушку
+ * после build_menu_tree. Возвращает 0, если не хватает места. */
+static int build_se_parts(void) {
+    if (cave_len + SE_MARK_LEN + 1024 > max_cave) return 0;
+    size_t o = 0;
+    memcpy(cave + cave_len, SE_MARK, strlen(SE_MARK));
+    cave_len += SE_MARK_LEN;
+    cb_off = cave_len;
+
+    uint64_t s_name = cs_str(&o, "NX Redux Patch");
+    uint64_t s_desc = cs_str(&o,
+        "\xd0\xa3\xd1\x81\xd1\x82\xd0\xb0\xd0\xbd\xd0\xbe\xd0\xb2\xd0\xba\xd0\xb0 \xd0\xb8 "
+        "\xd1\x83\xd0\xb4\xd0\xb0\xd0\xbb\xd0\xb5\xd0\xbd\xd0\xb8\xd0\xb5 \xd0\xbf\xd0\xb0"
+        "\xd1\x82\xd1\x87\xd0\xb0");
+    uint64_t s_cmd = cs_str(&o, SE_CMD);
+
+    /* колбэк on_press(void) */
+    while (cb_off % 8) cb32(0);
+    se_cb_va = cbpc();
+    e_stp_pre(29, 30, 31, -2);       /* stp x29, x30, [sp, #-16]! */
+    e_addi(29, 31, 0);               /* mov x29, sp */
+    e_ld64(0, s_cmd);
+    e_bl(SE_SYSTEM_PLT);             /* system(cmd) */
+    e_movi(0, 0);
+    e_bl(SE_EXIT_PLT);               /* _exit(0): назад в меню, а не в зависшие настройки */
+    e_ret();
+
+    /* заглушка: build_menu_tree(), затем дописать пункт в main_page */
+    while (cb_off % 8) cb32(0);
+    se_stub_va = cbpc();
+    e_stp_pre(29, 30, 31, -2);
+    e_addi(29, 31, 0);
+    e_bl(SE_BUILD_VA);
+    e_ld64(9, SE_MAINPAGE);
+    e_ldr_w(10, 9, SE_PAGE_COUNT);
+    e_cmp_i(10, SE_MAX_ITEMS);
+    size_t at_full = cb_off;
+    e_bcond(0xA, cbpc());            /* b.ge done — заполнится ниже */
+    e_ldr_x(11, 9, SE_PAGE_ITEMS);
+    e_movi(12, SE_ITEM_SIZE);
+    e_madd(11, 10, 12, 11);          /* slot = items + count * 400 */
+    e_ld64(13, s_name);
+    e_str_x(13, 11, 0);
+    e_ld64(13, s_desc);
+    e_str_x(13, 11, 8);
+    e_movi(13, 2);                   /* ITEM_BUTTON */
+    e_str_w(13, 11, SE_ITEM_TYPE);
+    e_movi(13, 1);
+    e_str_w(13, 11, SE_ITEM_VIS);
+    e_ld64(13, se_cb_va);
+    e_str_x(13, 11, SE_ITEM_PRESS);
+    e_add_w(10, 10, 1);
+    e_str_w(10, 9, SE_PAGE_COUNT);
+    e_ldr_w(12, 9, SE_PAGE_MAX);
+    e_cmp_r(12, 10);
+    size_t at_max = cb_off;
+    e_bcond(0xA, cbpc());            /* b.ge done */
+    e_str_w(10, 9, SE_PAGE_MAX);
+    uint64_t done = cbpc();
+    fix_bcond_cave(at_full, 0xA, done);
+    fix_bcond_cave(at_max, 0xA, done);
+    e_ldp_post(29, 30, 31, 2);
+    e_ret();
+
+    cave_len = cb_off;
+    return 1;
+}
+
+static int se_call_site(uint8_t **out) {
+    Shdr *text = NULL;
+    for (int i = 0; i < shnum; i++)
+        if (!strcmp(sh[i].name, ".text")) text = &sh[i];
+    if (!text) return 0;
+    if (SE_CALL_VA < text->addr || SE_CALL_VA + 4 > text->addr + text->size) return 0;
+    *out = buf + text->off + (SE_CALL_VA - text->addr);
+    return 1;
+}
+
+static int se_marker_at(size_t *at) {
+    size_t ml = strlen(SE_MARK);
+    for (size_t i = 0; i + ml <= buf_len; i++) {
+        if (!memcmp(buf + i, SE_MARK, ml)) { *at = i; return 1; }
+    }
+    return 0;
+}
+
+/* наш хук уже стоит? (bl за пределы стокового RX-сегмента) */
+/* наш хук уже стоит? (bl за пределы стокового RX-сегмента) */
+static int se_hooked(uint32_t w) {
+    if ((w & 0xFC000000u) != 0x94000000u) return 0;
+    int64_t d = (int64_t)(w & 0x03FFFFFFu);
+    if (d & 0x02000000) d -= 0x04000000;
+    uint64_t t = SE_CALL_VA + (uint64_t)(d << 2);
+    return t >= SE_RX_END0 && t < SE_RX_END0 + 0x200000;
+}
+
+/* вставить пункт: 1 — вставлен, 0 — не нашли точку вызова */
+static int apply_settings_entry(void) {
+    uint8_t *site = NULL;
+    if (!se_call_site(&site)) return 0;
+    if (se_hooked(rd32(site))) return 0;
+    if (rd32(site) != SE_CALL_WORD) return 0;
+    uint32_t bl = enc_bl(SE_CALL_VA, se_stub_va);
+    if (!bl) return 0;
+    wr32(site, bl);
+    return 1;
+}
+
 int main(int argc, char **argv) {
     if (argc < 4) {
         fprintf(stderr, "usage: nxpatch <in.elf> <out.elf> <strings.tsv> [--relax]\n");
+        fprintf(stderr, "       nxpatch <in.elf> <out.elf> --settings-entry\n");
         return 1;
     }
+    /* --settings-entry: отдельный проход по settings.elf (только пункт меню) */
+    int se_mode = !strcmp(argv[3], "--settings-entry");
     const char *disp_file = NULL;
+    int se_entry = 0;
     for (int a = 4; a < argc; a++) {
         if (!strcmp(argv[a], "--relax")) allow_relax = 1;
         else if (!strcmp(argv[a], "--minarch-display") && a + 1 < argc) disp_file = argv[++a];
+        else if (!strcmp(argv[a], "--settings-entry")) se_entry = 1;
     }
 
     FILE *f = fopen(argv[1], "rb");
@@ -1801,11 +1955,21 @@ int main(int argc, char **argv) {
     if (rd16(buf + 16) != 2) die("not ET_EXEC");
     if (rd16(buf + 18) != 0xB7) die("not AArch64");
 
-    /* already patched? */
-    for (size_t i = 0; i + 8 <= buf_len; i++) {
-        if (memcmp(buf + i, MARKER, 7) == 0) {
-            fprintf(stderr, "nxpatch: already patched\n");
+    if (se_mode) {
+        size_t at;
+        if (se_marker_at(&at)) {
+            fprintf(stderr, "nxpatch: settings entry already\n");
             return 2;
+        }
+    }
+
+    /* already patched? */
+    if (!se_mode) {
+        for (size_t i = 0; i + 8 <= buf_len; i++) {
+            if (memcmp(buf + i, MARKER, 7) == 0) {
+                fprintf(stderr, "nxpatch: already patched\n");
+                return 2;
+            }
         }
     }
 
@@ -1876,6 +2040,44 @@ int main(int argc, char **argv) {
         if (!strcmp(sh[i].name, ".rodata")) rodata = &sh[i];
     }
     if (!text || !rodata) die("no .text/.rodata");
+
+    /* ---- пункт «NX Redux Patch» в настройках (отдельный проход) ---- */
+    if (se_mode) {
+        if (!build_se_parts()) die("cave overflow");
+        if (!apply_settings_entry()) {
+            fprintf(stderr, "nxpatch: settings entry: call site not found (другая прошивка?)\n");
+            return 3;
+        }
+        while (cave_len % 8) cave[cave_len++] = 0;
+        insert_size = align_up(cave_len, 0x10000);
+        cave_ext = insert_size < (rw_page - cave_vaddr) ? insert_size : (rw_page - cave_vaddr);
+        if (cave_vaddr + cave_ext < cave_vaddr + cave_len) die("cave does not fit");
+        memmove(buf + ins_at + insert_size, buf + ins_at, buf_len - ins_at);
+        memset(buf + ins_at, 0, insert_size);
+        memcpy(buf + ins_at, cave, cave_len);
+        buf_len += insert_size;
+        for (int i = 0; i < phnum; i++) {
+            if (&ph[i] == rx) {
+                wr64(buf + ph[i].phoff + 32, ph[i].filesz + cave_ext);
+                wr64(buf + ph[i].phoff + 40, ph[i].memsz + cave_ext);
+            } else if (ph[i].type != 0 && ph[i].off >= ins_at && ph[i].filesz > 0) {
+                wr64(buf + ph[i].phoff + 8, ph[i].off + insert_size);
+            }
+        }
+        shoff_field += insert_size;
+        wr64(buf + 40, shoff_field);
+        for (int i = 0; i < shnum; i++) {
+            uint8_t *p = buf + shoff_field + (uint64_t)i * e_shentsize;
+            uint64_t so = rd64(p + 24);
+            if (so >= ins_at) wr64(p + 24, so + insert_size);
+        }
+        FILE *so = fopen(argv[2], "wb");
+        if (!so) die("cannot write output");
+        if (fwrite(buf, 1, buf_len, so) != buf_len) die("short write");
+        fclose(so);
+        printf("SE: пункт добавлен, size %zu\n", buf_len);
+        return 0;
+    }
 
     /* ---- mapping ---- */
     FILE *m = fopen(argv[3], "rb");
@@ -2102,10 +2304,14 @@ int main(int argc, char **argv) {
     int select_hint = patch_select_hint(text->addr);
 
     /* ---- insert ---- */
+    if (se_entry) {
+        if (!build_se_parts()) die("cave overflow (settings entry)");
+        if (!apply_settings_entry()) die("settings entry: call site not found (другая прошивка?)");
+    }
     grid_wrapped = fix_grid_wrap(code, code_len, text->addr);
     cs_patched = cs_built ? patch_console_search() : 0;
     kb_patched = kb_built ? patch_kb_tweaks() : 0;
-    if (copies == 0 && !grid_wrapped && !cs_patched && !date_copies && !select_hint) cave_len = cave_len_strings; /* кейв не понадобился */
+    if (copies == 0 && !grid_wrapped && !cs_patched && !date_copies && !select_hint && !se_entry) cave_len = cave_len_strings; /* кейв не понадобился */
     insert_size = align_up(cave_len, 0x10000);
     cave_ext = insert_size < (rw_page - cave_vaddr) ? insert_size : (rw_page - cave_vaddr);
     if (cave_vaddr + cave_ext < cave_vaddr + cave_len) die("cave does not fit");

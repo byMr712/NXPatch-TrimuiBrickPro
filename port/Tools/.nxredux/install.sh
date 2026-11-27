@@ -6,7 +6,7 @@
 
 SD="${SDCARD_PATH:-/mnt/SDCARD}"
 PAK="$(cd "$(dirname "$0")" 2>/dev/null && pwd)"
-[ -n "$PAK" ] || PAK="$SD/Tools/NX Redux Patch.pak"
+[ -n "$PAK" ] || PAK="$SD/Tools/.nxredux"
 LOG="$SD/Images/Bootlogo/Mr712_patch.log"
 BIN="$SD/.system/bin/nextui.elf"
 MINARCH="$SD/.system/bin/minarch.elf"
@@ -146,20 +146,28 @@ if [ -f "$base" ]; then
 	fi
 fi
 
-# --- settings.elf ---
+# --- settings.elf: перевод + пункт «NX Redux Patch» в настройках ---
+# settings собирается заново из официальной копии settings.elf.before:
+# в settings.elf есть место только под один кейв, поэтому перевод и пункт
+# дописываются одним проходом (--settings-entry).
 if [ -f "$SETELF" ]; then
-	scur="$(md5of "$SETELF")"
-	sbase="$SETELF"
-	if is_old "$scur" "$OLD_SETTINGS" && [ -f "$PAK/settings.elf.orig" ]; then
-		sbase="$PAK/settings.elf.orig"
-		log "settings.elf — старая сборка ($scur), основа: settings.elf.orig"
-	fi
-	if patch_into "$sbase" "$PAK/settings.tsv" /tmp/nx_settings.elf --relax; then
-		if [ ! -f "$PAK/settings.elf.before" ] && ! is_old "$scur" "$OLD_SETTINGS"; then
-			cp "$SETELF" "$PAK/settings.elf.before" 2>> "$LOG"
+	if grep -q 'Mr712RU' "$SETELF" 2>/dev/null || grep -q 'Mr712MENU' "$SETELF" 2>/dev/null; then
+		sbase="$PAK/settings.elf.before"
+		[ -f "$sbase" ] || sbase="$SETELF"
+	else
+		sbase="$SETELF"
+		if [ ! -f "$PAK/settings.elf.before" ] || [ "$(md5of "$sbase")" != "$(md5of "$PAK/settings.elf.before")" ]; then
+			cp "$SETELF" "$PAK/settings.elf.before" 2>> "$LOG" && log "settings.elf: копия официального файла обновлена"
 		fi
-		cp /tmp/nx_settings.elf "$SETELF" && sync && log "settings.elf пропатчен на лету"
-		rm -f /tmp/nx_settings.elf
+	fi
+	if patch_into "$sbase" "$PAK/settings.tsv" /tmp/nx_settings.elf "--relax --settings-entry"; then
+		if cp /tmp/nx_settings.elf "$SETELF.new" && mv -f "$SETELF.new" "$SETELF"; then
+			sync
+			log "settings.elf пропатчен (перевод + пункт в настройках)"
+		else
+			log "ОШИБКА: не удалось записать settings.elf"
+		fi
+		rm -f /tmp/nx_settings.elf "$SETELF.new"
 	else
 		rc=$?
 		if [ "$rc" = "2" ]; then log "settings.elf уже пропатчен"; else log "ОШИБКА: nxpatch settings rc=$rc"; fi
