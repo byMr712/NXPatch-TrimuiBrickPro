@@ -1,0 +1,2 @@
+﻿Распакуйте папки из этого архива в папку "Tools" на вашей флешке с установленной прошивкой NX Redux
+Extract the folders from this archive into the "Tools" folder on your SD card with NX Redux installed

@@ -84,11 +84,12 @@ The patcher sits at the very bottom of **Settings** — installing and removing 
 
 ## Installation
 
-1. Extract the [downloaded archive](https://github.com/byMr712/NXPatch-TrimuiBrickPro/releases) into the card root — it creates two folders:
+1. Extract the folders from the [downloaded archive](https://github.com/byMr712/NXPatch-TrimuiBrickPro/releases) into the **Tools** folder on the card with NX Redux — next to `PortMaster.pak` you get:
    ```
-   Tools/NX Redux Patch.pak/   the shortcut for the first run
-   Tools/.nxredux/             the patcher itself
+   NX Redux Patch.pak/   the shortcut for the first run
+   .nxredux/             the patcher itself
    ```
+   The archive also contains `Инструкция_Manual.txt` with the same note.
 2. Insert the card into the console and power it on.
 3. Open **Tools → NX Redux Patch**.
 4. The patcher adds an **NX Redux Patch** row at the very bottom of **Settings**. The Tools shortcut stays for now and goes away once the patch is installed.
