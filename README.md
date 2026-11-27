@@ -81,7 +81,7 @@
 
 ## Установка
 
-1. Скопируйте содержимое папки `port` в корень карты памяти, сохранив структуру:
+1. Скопируйте содержимое [скачанного архива](https://github.com/byMr712/NXPatch-TrimuiBrickPro/releases) в папку портов, у вас должна получиться примерно такая структура:
    ```
    Roms/Ports (PORTS)/NX REDUX Mr712 Patch.sh
    Roms/Ports (PORTS)/.ports/nxredux-mr712/...

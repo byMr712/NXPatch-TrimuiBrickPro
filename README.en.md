@@ -81,7 +81,7 @@ The Tools, Consoles and Collections grids wrap: down on the last row goes to the
 
 ## Installation
 
-1. Copy the contents of the `port` folder to the root of the SD card, keeping the structure:
+1. Copy the contents of the [downloaded archive](https://github.com/byMr712/NXPatch-TrimuiBrickPro/releases) into the ports folder; the structure should look something like this:
    ```
    Roms/Ports (PORTS)/NX REDUX Mr712 Patch.sh
    Roms/Ports (PORTS)/.ports/nxredux-mr712/...
