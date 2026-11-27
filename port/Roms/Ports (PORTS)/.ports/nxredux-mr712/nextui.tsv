@@ -55,7 +55,6 @@ Another collection has that name.	Такая коллекция уже есть.
 Connect to WiFi to fetch art	Подключите Wi-Fi для загрузки обложки
 Searching...	Поиск...
 Search: %s	Поиск: %s
-Search	Поиск
 Downloading...	Загрузка...
 Adding art...	Добавление обложки...
 Building mix...	Сборка обложки...
@@ -73,3 +72,35 @@ Wrong PIN. Try again.	Неверный PIN. Повторите
 Space	Пробел
 Confirm	Готово
 EXIT	ВЫХОД
+Search	Поиск
+Continue	Продолжить
+PLAY	ИГРАТЬ
+REMOVE	УБРАТЬ
+Recents	Недавние
+Recent	Недавние
+No Resumable Games	Нет игр с сохранением
+Suspend a game to see it here	Приостановите игру, чтобы увидеть её здесь
+No Preview	Нет превью
+Nothing played yet	Пока пусто
+Nothing played yet.	Пока пусто.
+Let's go!	Погнали!
+This month	В этом месяце
+Most played	Чаще всего
+ achievements	 достиж.
+Next: %s	Далее: %s
+Next: 	Далее: 
+Disc %i	Диск %i
+Today	Сегодня
+Yesterday	Вчера
+%ld days ago	%ld дн. назад
+Last week	На прошлой неделе
+%ld weeks ago	%ld нед. назад
+Last month	В прошлом месяце
+%ld months ago	%ld мес. назад
+Last year	В прошлом году
+%ld years ago	%ld лет назад
+%d of %d	%d из %d
+Powering off	Выключение
+BRIGHTNESS	ЯРКОСТЬ
+COLOR TEMP	ЦВ. ТЕМП.
+Quicksave created,\npowering off	Быстрое сохранение создано,\nвыключение

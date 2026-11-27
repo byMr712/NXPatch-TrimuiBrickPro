@@ -70,6 +70,29 @@ if [ "$cur_ver" != "$PATCH_VER" ]; then
 	esac
 fi
 
+# --- названия инструментов: Tools/map.txt (NextUI берёт его из папки Tools на карте) ---
+MAPSRC="$PAK/tools_map.txt"
+MAPDST="$SD/Tools/map.txt"
+if [ -f "$MAPSRC" ]; then
+	mkdir -p "$SD/Tools"
+	if [ -f "$MAPDST" ] && [ ! -f "$MAPDST.mr712.bak" ]; then
+		cp "$MAPDST" "$MAPDST.mr712.bak" 2>> "$LOG" && log "map.txt: сохранена исходная копия"
+	fi
+	if [ -f "$MAPDST" ]; then
+		awk -F'\t' 'NR==FNR { skip[$1]=1; next } !($1 in skip)' "$MAPSRC" "$MAPDST" > /tmp/nx_tools_map.txt 2>> "$LOG"
+	else
+		: > /tmp/nx_tools_map.txt
+	fi
+	cat "$MAPSRC" >> /tmp/nx_tools_map.txt
+	if cp /tmp/nx_tools_map.txt "$MAPDST"; then
+		sync
+		log "map.txt: названия инструментов переведены"
+	else
+		log "ОШИБКА: не удалось записать map.txt"
+	fi
+	rm -f /tmp/nx_tools_map.txt
+fi
+
 # --- папка настроек: как в оригинале (Settings.pak); если осталась переименованная — вернуть ---
 if [ -d "$TOOLS/ Настройки.pak" ] && [ ! -d "$TOOLS/Settings.pak" ]; then
 	if mv "$TOOLS/ Настройки.pak" "$TOOLS/Settings.pak" 2>> "$LOG"; then
@@ -116,7 +139,7 @@ if [ -f "$SETELF" ]; then
 		sbase="$PAK/settings.elf.orig"
 		log "settings.elf — старая сборка ($scur), основа: settings.elf.orig"
 	fi
-	if patch_into "$sbase" "$PAK/settings.tsv" /tmp/nx_settings.elf; then
+	if patch_into "$sbase" "$PAK/settings.tsv" /tmp/nx_settings.elf --relax; then
 		if ! is_old "$scur" "$OLD_SETTINGS"; then
 			cp "$SETELF" "$PAK/settings.elf.before" 2>> "$LOG"
 		fi

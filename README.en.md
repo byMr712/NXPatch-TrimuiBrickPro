@@ -17,6 +17,8 @@ A patch for **NX Redux on the TrimUI Brick Pro** that translates the interface i
 ## What Does This Patch Do
 
 - **Full Russian interface** for NextUI and Settings: main menu, tabs (CONSOLES, COLLECTIONS, TOOLS, RECENT, SEARCH), game list, game menu, every dialog (delete, rename, collections, artwork fetching), button hints and the on-screen keyboard.
+- **Everything visible in the shell is translated**: Home stats, the Game Switcher (including "Today", "Yesterday", "Last week"), setting values ("List"), empty states and hints.
+- **Tool names**: Artwork Manager → **Менеджер обложек**, Device Sync → **Синхронизация**, Game Tracker → **Статистика игр**, and the rest. NextUI reads them from `Tools/map.txt`; the installer appends the translations without dropping your own aliases, and removal restores the file.
 - **Settings** are translated completely, including item descriptions and the simple mode help text.
 - **Boot logo** `Big Mr712.bmp` with a signature; the clean variant `Big` stays available in `Settings → Boot logo`.
 - **Dedicated patcher menu** with a description of the selected item, black "Install / Remove / Exit" screens and wrap-around navigation.
@@ -69,6 +71,14 @@ The patch does not rebuild NextUI; it edits machine code inside the ELF files.
 - eight-byte pointers in string tables.
 
 The original strings stay in the file, which is why English labels are still visible in `strings`, while the interface already uses the Russian ones. Patched files are marked with `Mr712RU`; applying the patch twice returns code 2 ("already patched").
+
+### Tool names
+
+The Tools tab names are not compiled into the binary: NextUI reads them from `Tools/map.txt` on the card. The installer appends rows for the stock paks (`Artwork Manager.pak` → `Менеджер обложек`, etc.), keeping the original file as `map.txt.mr712.bak`; removal restores it (or deletes the file if it did not exist). This works on a clean card and on top of your own renames.
+
+### Relative dates ("Today", "Yesterday")
+
+With LTO, GCC turns `snprintf(dst, 64, "Today")` into a fixed `strlen+1` copy, so a longer Russian string would be cut to "Сег". `nxpatch` finds the five sites (`Today`, `Yesterday`, `Last week`, `Last month`, `Last year`) by signature and replaces the copy with a call to a NUL-terminating helper; the report says `date copies 5`.
 
 ### Truncated menu labels
 

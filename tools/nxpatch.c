@@ -1430,6 +1430,46 @@ static int fix_label_copy(uint64_t add_addr, int R, size_t en_len) {
     return 0;
 }
 
+/* Date words in GameInfo_segments: GCC inlined the known-size snprintf as a fixed
+ * copy of strlen(en)+1 bytes (Today 6, Yesterday 10, Last week 10, Last month 11,
+ * Last year 10), so a longer Russian string was cut mid-sequence ("Сегодня" -> "Сег").
+ * The destination is when[64]: replace the four load/store instructions with a call
+ * to the copy_helper (copies to NUL), keeping the already-patched adrp+add source. */
+static int patch_date_copies(void) {
+    if (!helper_va) return 0;
+    static const struct {
+        uint64_t va;
+        uint32_t sig[4];
+        int off;
+    } sites[] = {
+        {0x489fdcULL, {0xb9400001u, 0xb8402000u, 0xb90073e1u, 0xb80723e0u}, 8},
+        {0x48a110ULL, {0xf9400001u, 0xf9003be1u, 0x79401000u, 0x7900f3e0u}, 8},
+        {0x48a12cULL, {0xf9400001u, 0xf9003be1u, 0x79401000u, 0x7900f3e0u}, 8},
+        {0x48a17cULL, {0xf9400001u, 0xf9003be1u, 0xb8407000u, 0xb80773e0u}, 8},
+        {0x48a0a8ULL, {0xf9400001u, 0xf9003be1u, 0x79401000u, 0x7900f3e0u}, 12},
+    };
+    int n = 0;
+    for (size_t i = 0; i < sizeof(sites) / sizeof(sites[0]); i++) {
+        uint64_t pc = sites[i].va + (uint64_t)sites[i].off;
+        uint8_t *p = file_ptr(pc, 16);
+        if (!p) continue;
+        int ok = 1;
+        for (int j = 0; j < 4; j++)
+            if (rd32(p + j * 4) != sites[i].sig[j]) { ok = 0; break; }
+        if (!ok) continue;
+        uint32_t bl = enc_bl(pc + 8, helper_va);
+        if (!bl) continue;
+        wr32(p, enc_mov_x(17, 0));
+        wr32(p + 4, 0x9101C3F0u); /* add x16, sp, #0x70: copy_helper's dst */
+        wr32(p + 8, bl);
+        wr32(p + 12, 0xD503201Fu);
+        if (getenv("NXPATCH_VERBOSE"))
+            fprintf(stderr, "date copy site %llx\n", (unsigned long long)pc);
+        n++;
+    }
+    return n;
+}
+
 static void die(const char *msg) {
     fprintf(stderr, "nxpatch: %s\n", msg);
     exit(1);
@@ -1758,6 +1798,7 @@ int main(int argc, char **argv) {
     int total_pairs = 0;
     int copies = 0;
     int grid_wrapped = 0;
+    int date_copies = 0;
     for (int i = 0; i < mapnum; i++) {
         if (!map[i].found) continue;
         size_t el = strlen(map[i].en);
@@ -1787,11 +1828,13 @@ int main(int argc, char **argv) {
         }
     }
 
+    date_copies = patch_date_copies();
+
     /* ---- insert ---- */
     grid_wrapped = fix_grid_wrap(code, code_len, text->addr);
     cs_patched = cs_built ? patch_console_search() : 0;
     kb_patched = kb_built ? patch_kb_tweaks() : 0;
-    if (copies == 0 && !grid_wrapped && !cs_patched) cave_len = cave_len_strings; /* кейв не понадобился */
+    if (copies == 0 && !grid_wrapped && !cs_patched && !date_copies) cave_len = cave_len_strings; /* кейв не понадобился */
     insert_size = align_up(cave_len, 0x10000);
     cave_ext = insert_size < (rw_page - cave_vaddr) ? insert_size : (rw_page - cave_vaddr);
     if (cave_vaddr + cave_ext < cave_vaddr + cave_len) die("cave does not fit");
@@ -1823,7 +1866,7 @@ int main(int argc, char **argv) {
 
     int missing = 0;
     for (int i = 0; i < mapnum; i++) if (!map[i].found) missing++;
-    printf("OK: %d strings, %d missing, %d adrp+add, %d label copies, grid wrap %d, console search %d, kb %d, cave %zu/%llu, size %zu\n",
-           mapnum - missing, missing, total_pairs, copies, grid_wrapped, cs_patched, kb_patched, cave_len, (unsigned long long)max_cave, buf_len);
+    printf("OK: %d strings, %d missing, %d adrp+add, %d label copies, grid wrap %d, console search %d, kb %d, date copies %d, cave %zu/%llu, size %zu\n",
+           mapnum - missing, missing, total_pairs, copies, grid_wrapped, cs_patched, kb_patched, date_copies, cave_len, (unsigned long long)max_cave, buf_len);
     return 0;
 }

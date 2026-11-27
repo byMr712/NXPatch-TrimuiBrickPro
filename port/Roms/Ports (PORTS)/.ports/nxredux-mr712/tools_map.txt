@@ -1,0 +1,11 @@
+Artwork Manager.pak	Менеджер обложек
+Device Sync.pak	Синхронизация
+Emulator Settings.pak	Настройки эмулятора
+Files.pak	Файлы
+Game Tracker.pak	Статистика игр
+Image Viewer.pak	Просмотр изображений
+Media Player.pak	Медиаплеер
+Music Player.pak	Музыка
+RetroAchievements.pak	Достижения
+Settings.pak	Настройки
+Xtras.pak	Дополнения

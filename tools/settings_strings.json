@@ -433,7 +433,7 @@
     "Show overlay for volume, brightness, and color temp adjustments": "Показывать оверлей громкости, яркости и цветовой температуры",
     "Speaker - 48000 Hz": "Динамик — 48000 Гц",
     "Speaker volume (0-20)": "Громкость динамика (0–20)",
-    "The pictures in the Backdrop's row. 2D box art and Wheel come from Artwork Manager > Settings.": "Картинки в ряду фона. 2D-обложка и логотип — из Artwork Manager > Настройки.",
+    "The pictures in the Backdrop's row. 2D box art and Wheel come from Artwork Manager > Settings.": "Картинки в ряду фона. 2D-обложка и логотип — из Менеджера обложек > Настройки.",
     "The tabs and the button hints. Hidden, L1/R1 still switch tabs; Lists show play time there.": "Вкладки и подсказки кнопок. Если скрыть, L1/R1 всё равно переключают вкладки.",
     "Which side a vertical game list's stack sits on; its details take the other side.": "С какой стороны вертикальный список; детали занимают другую сторону.",
     "Your settings are automatically saved": "Настройки сохраняются автоматически",
@@ -441,6 +441,22 @@
     "Connecting...": "Подключение...",
     "Disconnecting...": "Отключение...",
     "SET": "ВЫБРАТЬ",
-    "LEFT/RIGHT": "ВЛЕВО/ВПРАВО"
+    "LEFT/RIGHT": "ВЛЕВО/ВПРАВО",
+    "List art": "Арт списка",
+    "The picture behind the List. Mix, 2D box art and Wheel come from Artwork Manager > Settings. None shows a plain list with no picture or background.": "Картинка за списком. Смесь, 2D-обложка и логотип — из Менеджера обложек > Настройки. «Нет» — список без картинки и фона.",
+    "24 HOUR": "24 ЧАС",
+    "12 HOUR": "12 ЧАС",
+    "VOL. -": "ГРОМК. -",
+    "VOL. +": "ГРОМК. +",
+    "COLOR TEMP": "ЦВ. ТЕМП.",
+    "BRIGHTNESS": "ЯРКОСТЬ",
+    "Deleted %d item%s.": "Удалено файлов: %d",
+    "Connecting to %s...": "Подключение к %s...",
+    "Could not join \"%s\". Check that the network is in range and try again.": "Не удалось подключиться к «%s». Проверьте, что сеть в зоне действия.",
+    "Could not join \"%s\". Check the password and try again.": "Не удалось подключиться к «%s». Проверьте пароль.",
+    "SSH/SFTP active. root@%s  No password": "SSH/SFTP активен. root@%s  Без пароля",
+    "SSH/SFTP active. root@%s  Password: tina": "SSH/SFTP активен. root@%s  Пароль: tina",
+    "LED brightness during charging/low battery": "Яркость LED при зарядке/низком заряде",
+    "What shows with the Consoles tab: each console's controller, your own background pictures (bg.png), or nothing.": "Что показывать на вкладке «Консоли»: геймпад консоли, свои фоны (bg.png) или ничего."
   }
 }

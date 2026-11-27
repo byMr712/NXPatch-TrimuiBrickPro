@@ -44,6 +44,24 @@ if [ -d "$TOOLS/ Настройки.pak" ] && [ ! -d "$TOOLS/Settings.pak" ]; th
 	fi
 fi
 
+# названия инструментов: вернуть исходный Tools/map.txt
+MAPDST="$SD/Tools/map.txt"
+if [ -f "$MAPDST.mr712.bak" ]; then
+	if cp "$MAPDST.mr712.bak" "$MAPDST"; then
+		rm -f "$MAPDST.mr712.bak"
+		sync
+		log "map.txt: исходная копия восстановлена"
+	fi
+elif [ -f "$PAK/tools_map.txt" ] && [ -f "$MAPDST" ]; then
+	awk -F'\t' 'NR==FNR { skip[$1]=1; next } !($1 in skip)' "$PAK/tools_map.txt" "$MAPDST" > /tmp/nx_tools_map.txt 2>> "$LOG"
+	if [ -s /tmp/nx_tools_map.txt ]; then
+		cp /tmp/nx_tools_map.txt "$MAPDST" && sync && log "map.txt: записи патча удалены"
+	else
+		rm -f "$MAPDST" && sync && log "map.txt: удалён"
+	fi
+	rm -f /tmp/nx_tools_map.txt
+fi
+
 # логотип загрузчика
 if [ -f "$PAK/bootlogo_before.bmp" ]; then
 	MNT="$(awk -v d="$DEV" '$1==d {print $2; exit}' /proc/mounts)"
