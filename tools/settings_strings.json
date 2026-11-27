@@ -283,7 +283,7 @@
     "INSTALL": "УСТАНОВИТЬ",
     "CHANGE": "ИЗМЕНИТЬ",
     "SCROLL": "ПРОКРУТКА",
-    "Space": "Пробел",
+    "Space": "ПРОБЕЛ",
     "SHIFT": "РЕГИСТР",
     "Show notification when saving game state": "Уведомлять о сохранении",
     "Show notification when loading game state": "Уведомлять о загрузке",
@@ -457,6 +457,7 @@
     "SSH/SFTP active. root@%s  No password": "SSH/SFTP активен. root@%s  Без пароля",
     "SSH/SFTP active. root@%s  Password: tina": "SSH/SFTP активен. root@%s  Пароль: tina",
     "LED brightness during charging/low battery": "Яркость LED при зарядке/низком заряде",
-    "What shows with the Consoles tab: each console's controller, your own background pictures (bg.png), or nothing.": "Что показывать на вкладке «Консоли»: геймпад консоли, свои фоны (bg.png) или ничего."
+    "What shows with the Consoles tab: each console's controller, your own background pictures (bg.png), or nothing.": "Что показывать на вкладке «Консоли»: геймпад консоли, свои фоны (bg.png) или ничего.",
+    "Confirm": "ГОТОВО"
   }
 }
