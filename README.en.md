@@ -88,8 +88,6 @@ The Tools, Consoles and Collections grids wrap: down on the last row goes to the
    ```
    The folder name may be anything (`Ports`, `PORTS`, etc.): the scripts derive their path from their own file instead of a hard-coded `Ports (PORTS)`. The folder still has to be a console NX Redux lists (normally `Ports (PORTS)`), with the `.sh` next to `.ports/nxredux-mr712/`.
 2. Insert the card into the console and power it on.
-
-> To build a ready-to-copy archive, run `build.bat` in the project root: it writes `builds/NXPatch_v1.0_for_Trimui_Brick_Pro.zip`. The archive is flat (`NX REDUX Mr712 Patch.sh` plus `.ports/`), so unpack it **into the ports console folder** — under any name (`Ports (PORTS)`, `Ports`, ...). It must be the ports console: `.sh` is launched by its emulator; in a regular console (NES, GB, ...) the file shows up but will not start.
 3. Open **Ports** and start **NX REDUX Mr712 Patch** (or `TOOLS → NX REDUX Mr712 Patch`).
 4. Choose **Install patch** and confirm.
 5. Wait for the "Done" message and reboot the console.
