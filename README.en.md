@@ -80,7 +80,6 @@ The patcher sits at the very bottom of **Settings** — installing and removing 
 
 - Device: **TrimUI Brick Pro**.
 - Firmware: **NX Redux 2.5.1**.
-- The patch works with the **installed** binaries.
 
 ## Installation
 
