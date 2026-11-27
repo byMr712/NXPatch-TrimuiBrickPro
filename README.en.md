@@ -10,9 +10,9 @@
 
 A patch for **NX Redux on the TrimUI Brick Pro** that translates the interface into Russian, replaces the boot logo and adds a few menu improvements. The patch is applied on the fly to the already installed `nextui.elf` / `settings.elf` and can be removed just as easily.
 
-| Patcher menu | Translated game menu |
+| Patcher menu | Main screen |
 | :---: | :---: |
-| ![Patcher](images/patch-menu.png) | ![Game menu](images/game-menu-ru.png) |
+| ![Patcher](images/patch-menu.png) | ![Main screen](images/main-ui.png) |
 
 ## What Does This Patch Do
 
@@ -27,6 +27,54 @@ A patch for **NX Redux on the TrimUI Brick Pro** that translates the interface i
 - **Search within the console**: a game-menu item (also available from the search results menu) that matches the **beginning of the game title** in the current console folder (the file extension is ignored). Back from the results returns to the search prompt with the previous query; back again returns to the game list. The keyboard shows "Поиск в консоли <console name>" (the name in white), centred hints, L1 = space, R1 = done; an empty result shows no artwork.
 - **"Continue" row at the top of a console**: the first row is that console's newest game from Recents, with its cover; A launches it the same way Recents does (loading the save state when there is one). Computed once per list, with no disk access.
 - **Version check**: if `version.txt` is not `NXRedux-v2.5.1`, the patch warns and offers to cancel (cancel is the default).
+
+## Screenshots
+
+Every image is a full 1024×768 console screen, not a crop.
+
+### Main screen and tools
+
+| Main screen | Artwork Manager |
+| :---: | :---: |
+| ![Main screen](images/main-ui.png) | ![Artwork Manager](images/tools-artwork.png) |
+
+| Device Sync | Game menu |
+| :---: | :---: |
+| ![Device Sync](images/tools-sync.png) | ![Game menu](images/game-menu-ru.png) |
+
+The Tools, Consoles and Collections grids wrap: down on the last row goes to the first, up on the first row goes to the last.
+
+### Search within a console
+
+| Keyboard | Results |
+| :---: | :---: |
+| ![Search keyboard](images/search-keyboard.png) | ![Search results](images/search-results.png) |
+
+### Continue row
+
+![Continue row](images/continue-row.png)
+
+### In-game menu
+
+| Main menu | Options |
+| :---: | :---: |
+| ![In-game menu](images/in-game-menu.png) | ![Options](images/in-game-options.png) |
+
+| Frontend | Shortcuts |
+| :---: | :---: |
+| ![Frontend](images/in-game-frontend.png) | ![Shortcuts](images/in-game-shortcuts.png) |
+
+### Settings
+
+| Settings | Layouts |
+| :---: | :---: |
+| ![Settings](images/settings-ru.png) | ![Layouts](images/settings-layouts.png) |
+
+### Boot logo and patcher
+
+| Boot logo | Patcher menu |
+| :---: | :---: |
+| ![Boot logo](images/bootlogo.png) | ![Patcher](images/patch-menu.png) |
 
 ## Compatibility
 
@@ -108,9 +156,7 @@ Both live in the same cave and are wired in through hooks on the list handler:
   when there is one). Details, measurements and pitfalls:
   [docs/continue_row.md](docs/continue_row.md).
 
-| Console search | "Continue" row |
-| :---: | :---: |
-| ![Search](images/console-search.png) | ![Continue](images/continue-row.png) |
+Screenshots of the keyboard and results are in the [Screenshots](#screenshots) section.
 
 ### Patcher menu
 
