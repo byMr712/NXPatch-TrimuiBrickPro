@@ -6,7 +6,7 @@
 
 SD="${SDCARD_PATH:-/mnt/SDCARD}"
 PAK="$(cd "$(dirname "$0")" 2>/dev/null && pwd)"
-[ -n "$PAK" ] || PAK="$SD/Roms/Ports (PORTS)/.ports/nxredux-mr712"
+[ -n "$PAK" ] || PAK="$SD/Tools/NX Redux Patch.pak"
 LOG="$SD/Images/Bootlogo/Mr712_patch.log"
 BIN="$SD/.system/bin/nextui.elf"
 MINARCH="$SD/.system/bin/minarch.elf"
@@ -23,6 +23,20 @@ SHOW2="$SD/.system/bin/show2.elf"
 PATCHER="$PAK/nxpatch"
 
 PATCH_VER="NXRedux-v2.5.1"
+
+# --- переезд со старой установки «через Порты» ---
+OLDPAK="$SD/Roms/Ports (PORTS)/.ports/nxredux-mr712"
+if [ -d "$OLDPAK" ] && [ "$OLDPAK" != "$PAK" ]; then
+	for f in nextui.elf.before settings.elf.before minarch.elf.before bootlogo_before.bmp; do
+		if [ -f "$OLDPAK/$f" ] && [ ! -f "$PAK/$f" ]; then
+			cp "$OLDPAK/$f" "$PAK/$f" 2>> "$LOG" && log "бэкап $f перенесён из старой папки порта"
+		fi
+	done
+	rm -rf "$OLDPAK" 2>> "$LOG"
+	rm -f "$SD/Roms/Ports (PORTS)/NX REDUX Mr712 Patch.sh" "$SD/Roms/Ports (PORTS)/NX Redux Patch.sh" 2>> "$LOG"
+	rmdir "$SD/Roms/Ports (PORTS)/.ports" 2>/dev/null
+	log "старая установка в «Портах» удалена"
+fi
 
 # наши прошлые пропатченные сборки: их нельзя брать за основу
 OLD_NEXTUI="9263ea8c03c3e2a6bc4e325f619d4d33 c493a0a4ae13cf1277c8a0e366e8145c ceeeb642de4d558df847fac31eeeb288"
@@ -120,8 +134,8 @@ if is_old "$cur" "$OLD_NEXTUI" && [ -f "$PAK/nextui.elf.orig" ]; then
 fi
 if [ -f "$base" ]; then
 	if patch_into "$base" "$PAK/nextui.tsv" /tmp/nx_nextui.elf --relax; then
-		# запоминаем то, что реально стояло (только если это не наш патч)
-		if ! is_old "$cur" "$OLD_NEXTUI"; then
+		# запоминаем то, что реально стояло (первый раз): по нему идёт откат
+		if [ ! -f "$PAK/nextui.elf.before" ] && ! is_old "$cur" "$OLD_NEXTUI"; then
 			cp "$BIN" "$PAK/nextui.elf.before" 2>> "$LOG"
 		fi
 		cp /tmp/nx_nextui.elf "$BIN" && sync && log "nextui.elf пропатчен на лету"
@@ -141,7 +155,7 @@ if [ -f "$SETELF" ]; then
 		log "settings.elf — старая сборка ($scur), основа: settings.elf.orig"
 	fi
 	if patch_into "$sbase" "$PAK/settings.tsv" /tmp/nx_settings.elf --relax; then
-		if ! is_old "$scur" "$OLD_SETTINGS"; then
+		if [ ! -f "$PAK/settings.elf.before" ] && ! is_old "$scur" "$OLD_SETTINGS"; then
 			cp "$SETELF" "$PAK/settings.elf.before" 2>> "$LOG"
 		fi
 		cp /tmp/nx_settings.elf "$SETELF" && sync && log "settings.elf пропатчен на лету"
@@ -157,7 +171,7 @@ fi
 # --- minarch.elf (внутриигровое меню всех эмуляторов) ---
 if [ -f "$MINARCH" ] && [ -f "$PAK/minarch.tsv" ]; then
 	if "$PATCHER" "$MINARCH" /tmp/nx_minarch.elf "$PAK/minarch.tsv" --relax --minarch-display "$PAK/minarch_display.tsv" >> "$LOG" 2>&1; then
-		cp "$MINARCH" "$PAK/minarch.elf.before" 2>> "$LOG"
+		[ -f "$PAK/minarch.elf.before" ] || cp "$MINARCH" "$PAK/minarch.elf.before" 2>> "$LOG"
 		cp /tmp/nx_minarch.elf "$MINARCH" && sync && log "minarch.elf пропатчен на лету"
 		rm -f /tmp/nx_minarch.elf
 	else

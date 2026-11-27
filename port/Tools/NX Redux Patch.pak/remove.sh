@@ -4,7 +4,7 @@
 
 SD="${SDCARD_PATH:-/mnt/SDCARD}"
 PAK="$(cd "$(dirname "$0")" 2>/dev/null && pwd)"
-[ -n "$PAK" ] || PAK="$SD/Roms/Ports (PORTS)/.ports/nxredux-mr712"
+[ -n "$PAK" ] || PAK="$SD/Tools/NX Redux Patch.pak"
 LOG="$SD/Images/Bootlogo/Mr712_patch.log"
 BIN="$SD/.system/bin/nextui.elf"
 MINARCH="$SD/.system/bin/minarch.elf"
@@ -18,6 +18,20 @@ DEV="/dev/mmcblk0p1"
 log() { echo "$(date '+%Y-%m-%d %H:%M:%S') $*" >> "$LOG"; }
 
 log "=== remove"
+
+# --- переезд со старой установки «через Порты» ---
+OLDPAK="$SD/Roms/Ports (PORTS)/.ports/nxredux-mr712"
+if [ -d "$OLDPAK" ] && [ "$OLDPAK" != "$PAK" ]; then
+	for f in nextui.elf.before settings.elf.before minarch.elf.before bootlogo_before.bmp; do
+		if [ -f "$OLDPAK/$f" ] && [ ! -f "$PAK/$f" ]; then
+			cp "$OLDPAK/$f" "$PAK/$f" 2>> "$LOG" && log "бэкап $f перенесён из старой папки порта"
+		fi
+	done
+	rm -rf "$OLDPAK" 2>> "$LOG"
+	rm -f "$SD/Roms/Ports (PORTS)/NX REDUX Mr712 Patch.sh" "$SD/Roms/Ports (PORTS)/NX Redux Patch.sh" 2>> "$LOG"
+	rmdir "$SD/Roms/Ports (PORTS)/.ports" 2>/dev/null
+	log "старая установка в «Портах» удалена"
+fi
 
 restore() { # $1 = current, $2 = .before, $3 = .orig
 	if [ -f "$2" ]; then

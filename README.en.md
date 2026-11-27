@@ -79,25 +79,31 @@ The Tools, Consoles and Collections grids wrap: down on the last row goes to the
 
 ## Installation
 
-1. Copy the contents of the [downloaded archive](https://github.com/byMr712/NXPatch-TrimuiBrickPro/releases) into the ports folder; the structure should look something like this:
+1. Extract the [downloaded archive](https://github.com/byMr712/NXPatch-TrimuiBrickPro/releases) into the card root — it creates:
    ```
-   Roms/Ports (PORTS)/NX REDUX Mr712 Patch.sh
-   Roms/Ports (PORTS)/.ports/nxredux-mr712/...
+   Tools/NX Redux Patch.pak/
+   ├── launch.sh
+   ├── install.sh
+   └── ...
    ```
-   The folder name may be anything (`Ports`, `PORTS`, etc.): the scripts derive their path from their own file instead of a hard-coded `Ports (PORTS)`. The folder still has to be a console NX Redux lists (normally `Ports (PORTS)`), with the `.sh` next to `.ports/nxredux-mr712/`.
 2. Insert the card into the console and power it on.
-3. Open **Ports** and start **NX REDUX Mr712 Patch** (or `TOOLS → NX REDUX Mr712 Patch`).
+3. Open **Tools** and start **NX Redux Patch**.
 4. Choose **Install patch** and confirm.
-5. Wait for the "Done" message and reboot the console.
+5. Wait for "Done" and reboot.
 
-Safety: the first run stores `nextui.elf.before` and `settings.elf.before`; the rollback uses them.
+> In Simple Mode the Tools tab is hidden — turn Simple Mode off first.
+> If the previous Ports-based version is still on the card, its files are cleaned up on the first install — the backups are carried over into the pak.
+
+Safety: the first run stores `nextui.elf.before`, `settings.elf.before` and `minarch.elf.before`; the rollback uses them.
 
 ## Removal
 
-1. Start **NX REDUX Mr712 Patch** and choose **Remove patch**.
-2. Reboot the console.
+1. Open **Tools → NX Redux Patch**.
+2. Choose **Remove patch**.
+3. Reboot.
 
-The official `nextui.elf` and `settings.elf` are restored, the original boot logo and the Settings folder name are returned. Logos added to the Settings list are kept.
+The official `nextui.elf`, `settings.elf` and `minarch.elf` are restored, the original boot logo and the Settings folder name are returned. Logos added to the Settings list are kept.
+
 
 ## How It Works (For Developers)
 
@@ -162,7 +168,7 @@ Screenshots of the keyboard and results are in the [Screenshots](#screenshots) s
 ## Repository Layout
 
 ```
-port/    ready-to-use set for the SD card (copy to the card root)
+port/    ready-to-use set for the SD card: Tools/NX Redux Patch.pak
 tools/   sources: nxpatch.c, mr712menu.c, translation tables, helper scripts
 docs/    technical notes and plans
 images/  screenshots used by the READMEs

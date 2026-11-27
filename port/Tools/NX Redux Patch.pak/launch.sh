@@ -1,16 +1,22 @@
 #!/bin/sh
-# NX REDUX Mr712 Patch — меню с описанием пунктов.
+# NX Redux Patch — установка/удаление из «Инструментов».
+# Запускается как Tools/NX Redux Patch.pak/launch.sh.
 # Раскладка кнопок берётся из настроек системы (Button layout / Hint labels).
 
 SD="${SDCARD_PATH:-/mnt/SDCARD}"
 HERE="$(cd "$(dirname "$0")" 2>/dev/null && pwd)"
-[ -n "$HERE" ] || HERE="$SD/Roms/Ports (PORTS)"
-PAK="$HERE/.ports/nxredux-mr712"
+[ -n "$HERE" ] || HERE="$SD/Tools/NX Redux Patch.pak"
+PAK="$HERE"
 LOG="$SD/Images/Bootlogo/Mr712_patch.log"
 MENU="$PAK/mr712menu"
 CFG="$SD/.userdata/shared/minuisettings.txt"
+export SDCARD_PATH="$SD"
+export LD_LIBRARY_PATH="/usr/trimui/lib:${LD_LIBRARY_PATH}"
 
 log() { echo "$(date '+%Y-%m-%d %H:%M:%S') $*" >> "$LOG"; }
+
+# на FAT/exFAT exec-биты могут потеряться
+chmod +x "$PAK/mr712menu" "$PAK/nxpatch" "$PAK/options.elf" "$PAK/install.sh" "$PAK/remove.sh" "$PAK/exit.sh" "$PAK/yes.sh" "$PAK/no.sh" 2>/dev/null
 
 bl="$(grep -m1 '^buttonlayout=' "$CFG" 2>/dev/null | cut -d= -f2)"
 hl="$(grep -m1 '^hintlabels=' "$CFG" 2>/dev/null | cut -d= -f2)"
@@ -23,7 +29,7 @@ fi
 log "layout: buttonlayout=$bl hintlabels=$hl -> confirm=$conf cancel=$cancel hint=$hint"
 
 if [ -x "$MENU" ] && [ -f "$PAK/menu0.bmp" ]; then
-	LD_LIBRARY_PATH=/usr/trimui/lib "$MENU" "$PAK" "$conf" "$cancel" "$hint"
+	"$MENU" "$PAK" "$conf" "$cancel" "$hint"
 	rc=$?
 	log "menu rc=$rc"
 	[ "$rc" -eq 2 ] || exit 0
