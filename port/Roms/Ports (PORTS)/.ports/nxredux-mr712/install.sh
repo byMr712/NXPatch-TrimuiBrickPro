@@ -156,7 +156,7 @@ fi
 
 # --- minarch.elf (внутриигровое меню всех эмуляторов) ---
 if [ -f "$MINARCH" ] && [ -f "$PAK/minarch.tsv" ]; then
-	if patch_into "$MINARCH" "$PAK/minarch.tsv" /tmp/nx_minarch.elf --relax; then
+	if "$PATCHER" "$MINARCH" /tmp/nx_minarch.elf "$PAK/minarch.tsv" --relax --minarch-display "$PAK/minarch_display.tsv" >> "$LOG" 2>&1; then
 		cp "$MINARCH" "$PAK/minarch.elf.before" 2>> "$LOG"
 		cp /tmp/nx_minarch.elf "$MINARCH" && sync && log "minarch.elf пропатчен на лету"
 		rm -f /tmp/nx_minarch.elf

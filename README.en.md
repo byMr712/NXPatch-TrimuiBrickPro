@@ -20,7 +20,7 @@ A patch for **NX Redux on the TrimUI Brick Pro** that translates the interface i
 - **Everything visible in the shell is translated**: Home stats, the Game Switcher (including "Today", "Yesterday", "Last week"), setting values ("List"), empty states and hints.
 - **Tool names**: Artwork Manager → **Менеджер обложек**, Device Sync → **Синхронизация**, Game Tracker → **Статистика игр**, and the rest. NextUI reads them from `Tools/map.txt`; the installer appends the translations without dropping your own aliases, and removal restores the file.
 - **Settings** are translated completely, including item descriptions and the simple mode help text.
-- **The in-game menu** (MENU in any emulator): "Продолжить", "Сохранить", "Загрузить", "Опции", "Выход", plus "Оболочка", "Опции ядра", "Шейдеры", "Читы", "Управление", "Сочетания", "Сохранить настройки" and those submenus; the B hint reads "ВЫБРАТЬ". It lives in the shared `minarch.elf`, so it works for every console.
+- **The in-game menu** (MENU in any emulator): "Продолжить", "Сохранить", "Загрузить", "Опции", "Выход", plus "Оболочка", "Опции ядра", "Шейдеры", "Читы", "Управление", "Сочетания", "Сохранить настройки" and the contents of those sections; the B hint reads "ВЫБРАТЬ". "Опции ядра" has only its title translated — its items come from the core. It lives in the shared `minarch.elf`, so it works for every console.
 - **Boot logo** `Big Mr712.bmp` with a signature; the clean variant `Big` stays available in `Settings → Boot logo`.
 - **Dedicated patcher menu** with a description of the selected item, black "Install / Remove / Exit" screens and wrap-around navigation.
 - **Grid wrap-around**: in Tools, Consoles and Collections, pressing down on the last row moves to the first one, and up on the first row moves to the last one.
@@ -79,7 +79,9 @@ The Tools tab names are not compiled into the binary: NextUI reads them from `To
 
 ### In-game menu (`minarch.elf`)
 
-The MENU overlay is drawn by the shared frontend `minarch.elf` in `.system/bin`, not by NextUI. The patch translates its strings with the same `nxpatch` (a separate `minarch.tsv`), keeping the original as `minarch.elf.before`; removal restores it. Setting values (`On/Off`, `Auto`, `Native`, `Aspect`, `High`, ...) are deliberately left as the config and the core store them: translating them would change the saved values, and removing the patch would reset those settings. Item names, descriptions and hints are translated.
+The MENU overlay is drawn by the shared frontend `minarch.elf` in `.system/bin`, not by NextUI. The patch translates its strings with the same `nxpatch` (a separate `minarch.tsv`), keeping the original as `minarch.elf.before`; removal restores it.
+
+The Frontend, Shaders, Controls and Shortcuts submenus are translated inside. For strings that double as config keys, a separate `minarch_display.tsv` table swaps only the display pointers (`labels`, shortcut names, `button_labels`); the stored values stay English, so settings and button bindings keep working and a stock build can read the configs after removal. "Core Options" is the exception: only its title is translated, the items and values come from the core. The Controls button names (A Button, A Turbo, ...) also come from the core and stay as reported.
 
 ### Relative dates ("Today", "Yesterday")
 

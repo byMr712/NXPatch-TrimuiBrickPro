@@ -1532,6 +1532,236 @@ static int patch_select_hint(uint64_t text_addr) {
     return 0;
 }
 
+
+/* ---- display-only map for minarch menus (shortcut names, value labels) ---- */
+typedef struct {
+    int kind; /* 1 = shortcut name, 2 = option value label */
+    char *en, *ru;
+    uint64_t ru_va;
+} Disp;
+static Disp *disp;
+static int dispnum;
+
+typedef struct { uint64_t old, copy; } LabelCopy;
+static LabelCopy label_copy[128];
+static int label_copy_n;
+
+static void load_disp(const char *path) {
+    FILE *f = fopen(path, "r");
+    if (!f) die("cannot open display mapping");
+    char line[1024];
+    while (fgets(line, sizeof(line), f)) {
+        size_t n = strlen(line);
+        while (n && (line[n - 1] == '\n' || line[n - 1] == '\r')) line[--n] = 0;
+        if (!n || line[0] == '#') continue;
+        char *t1 = strchr(line, '\t');
+        if (!t1) continue;
+        *t1 = 0;
+        char *t2 = strchr(t1 + 1, '\t');
+        if (!t2) continue;
+        *t2 = 0;
+        int kind = !strcmp(line, "shortcut") ? 1 : !strcmp(line, "label") ? 2 : 0;
+        if (!kind) continue;
+        Disp *grown = realloc(disp, (size_t)(dispnum + 1) * sizeof(Disp));
+        if (!grown) die("out of memory");
+        disp = grown;
+        disp[dispnum].kind = kind;
+        disp[dispnum].en = strdup(t1 + 1);
+        disp[dispnum].ru = strdup(t2 + 1);
+        disp[dispnum].ru_va = 0;
+        dispnum++;
+    }
+    fclose(f);
+}
+
+static uint64_t cave_add(const char *s) {
+    while (cave_len % 8) cave[cave_len++] = 0;
+    uint64_t va = cave_vaddr + cave_len;
+    size_t n = strlen(s) + 1;
+    if (cave_len + n > max_cave) die("cave overflow");
+    memcpy(cave + cave_len, s, n);
+    cave_len += n;
+    return va;
+}
+
+static uint64_t find_disp(int kind, uint64_t str_va) {
+    uint8_t *p = file_ptr(str_va, 1);
+    if (!p) return 0;
+    for (int i = 0; i < dispnum; i++)
+        if (disp[i].kind == kind && !strcmp((char *)p, disp[i].en)) return disp[i].ru_va;
+    return 0;
+}
+
+static void display_opts(uint64_t opts, int count) {
+    for (int i = 0; i < count && i < 128; i++) {
+        uint8_t *o = file_ptr(opts + (uint64_t)i * 96, 96);
+        if (!o) continue;
+        uint64_t labels = rd64(o + 88);
+        if (!labels) continue;
+        uint64_t copy = 0;
+        for (int c = 0; c < label_copy_n; c++)
+            if (label_copy[c].old == labels) { copy = label_copy[c].copy; break; }
+        if (!copy) {
+            int n = 0;
+            while (n < 1024) {
+                uint8_t *q = file_ptr(labels + (uint64_t)n * 8, 8);
+                if (!q || !rd64(q)) break;
+                n++;
+            }
+            while (cave_len % 8) cave[cave_len++] = 0;
+            copy = cave_vaddr + cave_len;
+            if (cave_len + (uint64_t)(n + 1) * 8 > max_cave) die("cave overflow");
+            for (int j = 0; j < n; j++) {
+                uint64_t old = rd64(file_ptr(labels + (uint64_t)j * 8, 8));
+                uint64_t ru = find_disp(2, old);
+                wr64(cave + cave_len + (uint64_t)j * 8, ru ? ru : old);
+            }
+            wr64(cave + cave_len + (uint64_t)n * 8, 0);
+            cave_len += (uint64_t)(n + 1) * 8;
+            if (label_copy_n < 128) {
+                label_copy[label_copy_n].old = labels;
+                label_copy[label_copy_n].copy = copy;
+                label_copy_n++;
+            }
+        }
+        wr64(o + 88, copy);
+    }
+}
+
+static uint64_t shortcut_array_va;
+
+static void build_shortcut_display(void) {
+    const uint64_t names = 0x4a6d10ULL;
+    while (cave_len % 8) cave[cave_len++] = 0;
+    shortcut_array_va = cave_vaddr + cave_len;
+    if (cave_len + 22 * 8 > max_cave) die("cave overflow");
+    for (int i = 0; i < 22; i++) {
+        uint8_t *q = file_ptr(names + (uint64_t)i * 8, 8);
+        uint64_t old = q ? rd64(q) : 0;
+        uint64_t ru = old ? find_disp(1, old) : 0;
+        wr64(cave + cave_len + (uint64_t)i * 8, ru ? ru : old);
+    }
+    cave_len += 22 * 8;
+}
+
+/* OptionShortcuts_openMenu copies shortcut_names[j] into the row. Point that one
+ * adrp+add at the display array; shortcut_names[] itself stays English for
+ * bind saving and parsing. */
+static int patch_shortcut_ref(void) {
+    const uint64_t start = 0x4688d0ULL, len = 192;
+    for (uint64_t off = 0; off + 8 <= len; off += 4) {
+        uint64_t pa = start + off;
+        uint8_t *pp = file_ptr(pa, 4);
+        if (!pp) continue;
+        uint32_t w = rd32(pp);
+        if ((w & 0x9F000000u) != 0x90000000u) continue;
+        uint32_t rd = w & 31;
+        int64_t imm = ((int64_t)((((w >> 5) & 0x7FFFFu) << 2) | ((w >> 29) & 3u)) << 43) >> 31;
+        uint64_t page = (pa & ~0xFFFULL) + (uint64_t)imm;
+        for (int k = 1; k <= 5; k++) {
+            uint64_t aa = pa + (uint64_t)k * 4;
+            uint8_t *ap = file_ptr(aa, 4);
+            if (!ap) break;
+            uint32_t w2 = rd32(ap);
+            if ((w2 & 0xFF000000u) != 0x91000000u) continue;
+            int rn = (int)((w2 >> 5) & 31), rdd = (int)(w2 & 31);
+            if (rn != (int)rd) continue;
+            if (page + (uint64_t)((w2 >> 10) & 0xFFF) != 0x4a6d10ULL) continue;
+            int64_t delta = (int64_t)((shortcut_array_va >> 12) - (pa >> 12));
+            if (delta < -(1 << 20) || delta >= (1 << 20)) return 0;
+            uint32_t immlo = (uint32_t)(delta & 3), immhi = (uint32_t)((delta >> 2) & 0x7FFFF);
+            wr32(pp, 0x90000000u | (immlo << 29) | (immhi << 5) | rd);
+            wr32(ap, 0x91000000u | ((uint32_t)(shortcut_array_va & 0xFFF) << 10) | ((uint32_t)rn << 5) | (uint32_t)rdd);
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static uint64_t button_array_va;
+
+static void build_button_display(void) {
+    const uint64_t labels = 0x4d2150ULL;
+    int n = 0;
+    while (n < 64) {
+        uint8_t *q = file_ptr(labels + (uint64_t)n * 8, 8);
+        if (!q || !rd64(q)) break;
+        n++;
+    }
+    while (cave_len % 8) cave[cave_len++] = 0;
+    button_array_va = cave_vaddr + cave_len;
+    if (cave_len + (uint64_t)(n + 1) * 8 > max_cave) die("cave overflow");
+    for (int j = 0; j < n; j++) {
+        uint64_t old = rd64(file_ptr(labels + (uint64_t)j * 8, 8));
+        uint64_t ru = find_disp(2, old);
+        wr64(cave + cave_len + (uint64_t)j * 8, ru ? ru : old);
+    }
+    wr64(cave + cave_len + (uint64_t)n * 8, 0);
+    cave_len += (uint64_t)(n + 1) * 8;
+}
+
+/* Redirect every adrp+add to `target` inside [start,start+len) to `new_va`. */
+static void patch_pair_ref(uint64_t start, uint64_t len, uint64_t target, uint64_t new_va) {
+    for (uint64_t off = 0; off + 8 <= len; off += 4) {
+        uint64_t pa = start + off;
+        uint8_t *pp = file_ptr(pa, 4);
+        if (!pp) continue;
+        uint32_t w = rd32(pp);
+        if ((w & 0x9F000000u) != 0x90000000u) continue;
+        uint32_t rd = w & 31;
+        int64_t imm = ((int64_t)((((w >> 5) & 0x7FFFFu) << 2) | ((w >> 29) & 3u)) << 43) >> 31;
+        uint64_t page = (pa & ~0xFFFULL) + (uint64_t)imm;
+        for (int k = 1; k <= 5; k++) {
+            uint64_t aa = pa + (uint64_t)k * 4;
+            uint8_t *ap = file_ptr(aa, 4);
+            if (!ap) break;
+            uint32_t w2 = rd32(ap);
+            if ((w2 & 0xFF000000u) != 0x91000000u) continue;
+            int rn = (int)((w2 >> 5) & 31), rdd = (int)(w2 & 31);
+            if (rn != (int)rd) continue;
+            if (page + (uint64_t)((w2 >> 10) & 0xFFF) != target) continue;
+            int64_t delta = (int64_t)((new_va >> 12) - (pa >> 12));
+            if (delta < -(1 << 20) || delta >= (1 << 20)) return;
+            uint32_t immlo = (uint32_t)(delta & 3), immhi = (uint32_t)((delta >> 2) & 0x7FFFF);
+            wr32(pp, 0x90000000u | (immlo << 29) | (immhi << 5) | rd);
+            wr32(ap, 0x91000000u | ((uint32_t)(new_va & 0xFFF) << 10) | ((uint32_t)rn << 5) | (uint32_t)rdd);
+            return;
+        }
+    }
+}
+
+static int minarch_display(void) {
+    if (!dispnum) return 0;
+    for (int i = 0; i < dispnum; i++) disp[i].ru_va = cave_add(disp[i].ru);
+    build_shortcut_display();
+    build_button_display();
+    uint8_t *cfgp = file_ptr(0x4d00d0ULL, 312);
+    if (!cfgp) return 0;
+    uint32_t fcnt = rd32(cfgp + 40);
+    uint64_t fopts = rd64(cfgp + 48);
+    uint32_t scnt = rd32(cfgp + 120);
+    uint64_t sopts = rd64(cfgp + 128);
+    if (fcnt > 128 || scnt > 128 || !fopts || !sopts) return 0;
+    {
+        uint8_t *p = file_ptr(fopts, 96);
+        uint8_t *k = p ? file_ptr(rd64(p), 24) : NULL;
+        if (!k || strcmp((char *)k, "minarch_screen_scaling")) return 0;
+    }
+    patch_shortcut_ref();
+    patch_pair_ref(0x4688d0ULL, 192, 0x4d2150ULL, button_array_va);
+    patch_pair_ref(0x468990ULL, 380, 0x4d2150ULL, button_array_va);
+    display_opts(fopts, (int)fcnt);
+    display_opts(sopts, (int)scnt);
+    uint64_t scptr = rd64(cfgp + 288);
+    for (int i = 0; i < 22; i++) {
+        uint8_t *b = file_ptr(scptr + (uint64_t)i * 32, 32);
+        if (!b) break;
+        uint64_t ru = find_disp(1, rd64(b));
+        if (ru) wr64(b, ru);
+    }
+    return 1;
+}
+
 static uint64_t hexval(const char *s) { return strtoull(s, NULL, 0); }
 
 static void unescape(char *s) {
@@ -1549,7 +1779,11 @@ int main(int argc, char **argv) {
         fprintf(stderr, "usage: nxpatch <in.elf> <out.elf> <strings.tsv> [--relax]\n");
         return 1;
     }
-    if (argc >= 5 && strcmp(argv[4], "--relax") == 0) allow_relax = 1;
+    const char *disp_file = NULL;
+    for (int a = 4; a < argc; a++) {
+        if (!strcmp(argv[a], "--relax")) allow_relax = 1;
+        else if (!strcmp(argv[a], "--minarch-display") && a + 1 < argc) disp_file = argv[++a];
+    }
 
     FILE *f = fopen(argv[1], "rb");
     if (!f) die("cannot open input");
@@ -1666,6 +1900,7 @@ int main(int argc, char **argv) {
     }
     fclose(m);
     if (!mapnum) die("empty mapping");
+    if (disp_file) load_disp(disp_file);
 
     /* ---- cave ---- */
     cave_len = 0;
@@ -1680,6 +1915,8 @@ int main(int argc, char **argv) {
         memcpy(cave + cave_len, map[i].ru, l + 1);
         cave_len += l + 1;
     }
+
+    if (disp_file) minarch_display();
 
     /* ---- код-помощник для copy-сайтов контекстного меню ---- */
     size_t cave_len_strings = cave_len;

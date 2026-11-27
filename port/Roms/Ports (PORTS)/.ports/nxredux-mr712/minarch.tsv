@@ -38,8 +38,8 @@ Grid simulates an LCD grid.\nLine simulates CRT scanlines.\nEffects usually look
 Choose a custom overlay png from the Overlays folder	Свой PNG-оверлей из папки Overlays
 Offset X pixels	Смещение по X в пикселях
 Offset Y pixels	Смещение по Y в пикселях
-LINEAR smooths lines, but works better when final image is at higher resolution, so either core that outputs higher resolution or upscaling with shaders	LINEAR сглаживает линии, но лучше работает при высоком разрешении — нативном или с шейдерами
-Choose what should be used as a\nreference for the frame rate.\n"Native" uses the emulator frame rate,\n"Screen" uses the frame rate of the screen,\n"Emulated" follows the game's own timing\n(GPU cores).	Что использовать для частоты кадров:\n«Native» — частоту эмулятора,\n«Screen» — частоту экрана,\n«Emulated» — тайминг игры\n(GPU-ядра).
+LINEAR smooths lines, but works better when final image is at higher resolution, so either core that outputs higher resolution or upscaling with shaders	ЛИНЕЙНЫЙ сглаживает линии, но лучше работает при высоком разрешении — нативном или с шейдерами
+Choose what should be used as a\nreference for the frame rate.\n"Native" uses the emulator frame rate,\n"Screen" uses the frame rate of the screen,\n"Emulated" follows the game's own timing\n(GPU cores).	Что использовать для частоты кадров:\n«Нативный» — частоту эмулятора,\n«Экран» — частоту экрана,\n«Эмуляция» — тайминг игры\n(GPU-ядра).
 Over- or underclock the CPU to prioritize\npure performance or power savings.	Разгон или андерклок CPU:\nпроизводительность или экономия.
 Show frames per second, cpu load,\nresolution, and scaler information.	Показывать FPS, нагрузку CPU,\nразрешение и данные масштабирования.
 Fast forward will not exceed the\nselected speed (but may be less\ndepending on game and emulator).	Перемотка не превысит выбранную\nскорость (может быть ниже\nв зависимости от игры и эмулятора).
@@ -50,7 +50,7 @@ Interval between rewind snapshots.\nShorter intervals improve smoothness during 
 Compress rewind snapshots to save memory at the cost of CPU.	Сжимать снимки отмотки, экономя память ценой CPU.
 LZ4 acceleration used for rewind snapshots.\nLower values compress more but use more CPU.	Ускорение LZ4 для снимков отмотки.\nМеньше — сильнее сжатие, больше CPU.
 Play or mute audio when rewinding.	Звук при обратной отмотке.
-Native uses integer scaling.\nAspect uses core reported aspect ratio.\nAspect screen uses screen aspect ratio\nFullscreen has non-square pixels.	Native — целочисленный масштаб.\nAspect — соотношение сторон ядра.\nAspect Screen — соотношение экрана.\nFullscreen — неквадратные пиксели.
+Native uses integer scaling.\nAspect uses core reported aspect ratio.\nAspect screen uses screen aspect ratio\nFullscreen has non-square pixels.	Нативный — целочисленный масштаб.\nСоотношение — стороны ядра.\nЭкран — соотношение экрана.\nПолный — неквадратные пиксели.
 Optional Shaders Settings	Доп. настройки шейдеров
 Shader / Emulator Settings Preset	Пресет шейдеров/эмулятора
 Number of Shaders	Количество шейдеров
@@ -75,9 +75,9 @@ Number of shaders 1 to 3	Количество шейдеров: от 1 до 3
 Shader 1 program to run	Программа шейдера 1
 Shader 2 program to run	Программа шейдера 2
 Shader 3 program to run	Программа шейдера 3
-Method of upscaling, NEAREST or LINEAR	Метод масштабирования: NEAREST или LINEAR
+Method of upscaling, NEAREST or LINEAR	Метод масштабирования: БЛИЖАЙШИЙ или ЛИНЕЙНЫЙ
 This will choose resolution source to scale from	Источник разрешения для масштабирования
-This will scale images x times,\nscreen scales to screens resolution (can hit performance)	Масштаб изображения в N раз;\n«screen» — до разрешения экрана (может снизить FPS)
+This will scale images x times,\nscreen scales to screens resolution (can hit performance)	Масштаб изображения в N раз;\n«экран» — до разрешения экрана (может снизить FPS)
 No shaders available\n/Shaders folder or shader files not found	Шейдеры не найдены:\nпапка /Shaders пуста или отсутствует
 No extra settings found	Доп. настроек нет
 Shader Settings	Настройки шейдеров
@@ -144,3 +144,4 @@ Press A to set and X to clear.\nSupports single button and MENU+button.	A — н
 Press A to set and X to clear.\nOverrides Settings > Emulator Shortcuts.	A — назначить, X — очистить.\nПереопределяет «Сочетания» в настройках.
 No cheat file loaded.\nGet cheats from Xtras > Cheat Database.\n\n	Файл читов не загружен.\nЧиты — в «Дополнения > База читов».\n\n
 Cheats: the core exposes no system RAM, RAM cheats can't apply\n	Ядро не даёт доступ к RAM — читы RAM недоступны\n
+SET	НАЗНАЧИТЬ
