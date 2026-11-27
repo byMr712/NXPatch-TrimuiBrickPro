@@ -1499,6 +1499,39 @@ static uint8_t *file_ptr(uint64_t va, uint64_t len) {
     return NULL;
 }
 
+/* minarch's MENU hint array is {"B","BACK","A","SELECT",NULL}. The message word
+ * "SELECT" is also the button name stored in configs, so translating the literal
+ * would break bind parsing. Point just that array entry at the "OKAY" translation
+ * (ВЫБРАТЬ): the submenus and the main menu then read the same word. */
+static int ptrIsCStr(uint64_t va, const char *s) {
+    size_t n = strlen(s) + 1;
+    if (va < 0x400000ULL || va >= 0x100000000ULL) return 0; /* no wrap in file_ptr */
+    uint8_t *p = file_ptr(va, n);
+    return p && memcmp(p, s, n) == 0;
+}
+
+static int patch_select_hint(uint64_t text_addr) {
+    uint64_t ru = 0;
+    for (int i = 0; i < mapnum; i++)
+        if (map[i].found && strcmp(map[i].en, "OKAY") == 0) { ru = map[i].new_addr; break; }
+    if (!ru) return 0;
+    for (int s = 0; s < shnum; s++) {
+        if (!(sh[s].flags & 2) || sh[s].type == 8) continue;
+        if (sh[s].addr == text_addr) continue;
+        if (sh[s].off + sh[s].size > buf_len) continue;
+        uint8_t *d = buf + sh[s].off;
+        for (uint64_t q = 0; q + 40 <= sh[s].size; q += 8) {
+            if (rd64(d + q + 32) != 0) continue;
+            if (!ptrIsCStr(rd64(d + q), "B")) continue;
+            if (!ptrIsCStr(rd64(d + q + 16), "A")) continue;
+            if (!ptrIsCStr(rd64(d + q + 24), "SELECT")) continue;
+            wr64(d + q + 24, ru);
+            return 1;
+        }
+    }
+    return 0;
+}
+
 static uint64_t hexval(const char *s) { return strtoull(s, NULL, 0); }
 
 static void unescape(char *s) {
@@ -1829,12 +1862,13 @@ int main(int argc, char **argv) {
     }
 
     date_copies = patch_date_copies();
+    int select_hint = patch_select_hint(text->addr);
 
     /* ---- insert ---- */
     grid_wrapped = fix_grid_wrap(code, code_len, text->addr);
     cs_patched = cs_built ? patch_console_search() : 0;
     kb_patched = kb_built ? patch_kb_tweaks() : 0;
-    if (copies == 0 && !grid_wrapped && !cs_patched && !date_copies) cave_len = cave_len_strings; /* кейв не понадобился */
+    if (copies == 0 && !grid_wrapped && !cs_patched && !date_copies && !select_hint) cave_len = cave_len_strings; /* кейв не понадобился */
     insert_size = align_up(cave_len, 0x10000);
     cave_ext = insert_size < (rw_page - cave_vaddr) ? insert_size : (rw_page - cave_vaddr);
     if (cave_vaddr + cave_ext < cave_vaddr + cave_len) die("cave does not fit");
@@ -1866,7 +1900,7 @@ int main(int argc, char **argv) {
 
     int missing = 0;
     for (int i = 0; i < mapnum; i++) if (!map[i].found) missing++;
-    printf("OK: %d strings, %d missing, %d adrp+add, %d label copies, grid wrap %d, console search %d, kb %d, date copies %d, cave %zu/%llu, size %zu\n",
-           mapnum - missing, missing, total_pairs, copies, grid_wrapped, cs_patched, kb_patched, date_copies, cave_len, (unsigned long long)max_cave, buf_len);
+    printf("OK: %d strings, %d missing, %d adrp+add, %d label copies, grid wrap %d, console search %d, kb %d, date copies %d, select hint %d, cave %zu/%llu, size %zu\n",
+           mapnum - missing, missing, total_pairs, copies, grid_wrapped, cs_patched, kb_patched, date_copies, select_hint, cave_len, (unsigned long long)max_cave, buf_len);
     return 0;
 }

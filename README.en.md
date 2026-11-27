@@ -20,7 +20,7 @@ A patch for **NX Redux on the TrimUI Brick Pro** that translates the interface i
 - **Everything visible in the shell is translated**: Home stats, the Game Switcher (including "Today", "Yesterday", "Last week"), setting values ("List"), empty states and hints.
 - **Tool names**: Artwork Manager → **Менеджер обложек**, Device Sync → **Синхронизация**, Game Tracker → **Статистика игр**, and the rest. NextUI reads them from `Tools/map.txt`; the installer appends the translations without dropping your own aliases, and removal restores the file.
 - **Settings** are translated completely, including item descriptions and the simple mode help text.
-- **The in-game menu** (MENU in any emulator): "Продолжить", "Сохранить", "Загрузить", "Опции", "Выход", plus "Оболочка", "Опции ядра", "Шейдеры", "Читы", "Управление", "Сочетания", "Сохранить настройки" and those submenus. It lives in the shared `minarch.elf`, so it works for every console.
+- **The in-game menu** (MENU in any emulator): "Продолжить", "Сохранить", "Загрузить", "Опции", "Выход", plus "Оболочка", "Опции ядра", "Шейдеры", "Читы", "Управление", "Сочетания", "Сохранить настройки" and those submenus; the B hint reads "ВЫБРАТЬ". It lives in the shared `minarch.elf`, so it works for every console.
 - **Boot logo** `Big Mr712.bmp` with a signature; the clean variant `Big` stays available in `Settings → Boot logo`.
 - **Dedicated patcher menu** with a description of the selected item, black "Install / Remove / Exit" screens and wrap-around navigation.
 - **Grid wrap-around**: in Tools, Consoles and Collections, pressing down on the last row moves to the first one, and up on the first row moves to the last one.
