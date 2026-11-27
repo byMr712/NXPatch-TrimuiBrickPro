@@ -19,10 +19,6 @@ log() { echo "$(date '+%Y-%m-%d %H:%M:%S') $*" >> "$LOG"; }
 # на FAT/exFAT exec-биты могут потеряться
 chmod +x "$PAK/mr712menu" "$PAK/nxpatch" "$PAK/options.elf" "$PAK/install.sh" "$PAK/remove.sh" "$PAK/exit.sh" "$PAK/yes.sh" "$PAK/no.sh" 2>/dev/null
 
-# при первом входе: пункт в «Настройках» (ярлык из «Инструментов» убирается
-# только после установки патча — см. register.sh и install.sh)
-[ -f "$PAK/register.sh" ] && sh "$PAK/register.sh"
-
 bl="$(grep -m1 '^buttonlayout=' "$CFG" 2>/dev/null | cut -d= -f2)"
 hl="$(grep -m1 '^hintlabels=' "$CFG" 2>/dev/null | cut -d= -f2)"
 if [ "$bl" = "1" ]; then

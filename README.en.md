@@ -90,18 +90,16 @@ The patcher sits at the very bottom of **Settings** — installing and removing 
    ```
    The archive also contains `Инструкция_Manual.txt` with the same note.
 2. Insert the card into the console and power it on.
-3. Open **Tools → NX Redux Patch**.
-4. The patcher adds an **NX Redux Patch** row at the very bottom of **Settings**. The Tools shortcut stays for now and goes away once the patch is installed.
-5. Choose **Install patch** and confirm.
-6. Wait for "Done" and reboot.
+3. Open **Tools → NX Redux Patch**, choose **Install patch** and confirm.
+4. Wait for "Done" — the console reboots by itself.
 
-From then on the patcher starts from **Settings** (the bottom row). The row stays after removing the translation, so the patch can be reinstalled at any time.
+During the installation the patcher adds an **NX Redux Patch** row at the very bottom of **Settings** and removes its Tools shortcut. From then on start it from Settings — the row stays after removing the translation, so the patch can be reinstalled at any time.
 
 > In Simple Mode the Tools tab is hidden — turn Simple Mode off first.
 > A firmware update replaces the system files and the row disappears: extract the archive again and install the patch once more — the rollback copies are refreshed automatically. Games, saves, settings, collections and `Tools/.nxredux` are not touched by the update; pressing Remove patch after an update is safe — the old backups are never written over the new firmware.
 > If the previous Ports-based version is still on the card, its files are cleaned up on the first install — the backups are carried over into the pak.
 
-Safety: the first run stores `nextui.elf.before`, `settings.elf.before` and `minarch.elf.before`; the rollback uses them.
+Safety: the installation stores `nextui.elf.before`, `settings.elf.before` and `minarch.elf.before`; the rollback uses them.
 
 ## Removal
 
