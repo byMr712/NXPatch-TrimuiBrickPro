@@ -16,17 +16,12 @@ A patch for **NX Redux on the TrimUI Brick Pro** that translates the interface i
 
 ## What Does This Patch Do
 
-- **Full Russian interface** for NextUI and Settings: main menu, tabs (CONSOLES, COLLECTIONS, TOOLS, RECENT, SEARCH), game list, game menu, every dialog (delete, rename, collections, artwork fetching), button hints and the on-screen keyboard.
-- **Everything visible in the shell is translated**: Home stats, the Game Switcher (including "Today", "Yesterday", "Last week"), setting values ("List"), empty states and hints.
-- **Tool names**: Artwork Manager → **Менеджер обложек**, Device Sync → **Синхронизация**, Game Tracker → **Статистика игр**, and the rest. NextUI reads them from `Tools/map.txt`; the installer appends the translations without dropping your own aliases, and removal restores the file.
-- **Settings** are translated completely, including item descriptions and the simple mode help text.
-- **The in-game menu** (MENU in any emulator): "Продолжить", "Сохранить", "Загрузить", "Опции", "Выход", plus "Оболочка", "Опции ядра", "Шейдеры", "Читы", "Управление", "Сочетания", "Сохранить настройки" and the contents of those sections; the B hint reads "ВЫБРАТЬ". "Опции ядра" has only its title translated — its items come from the core. It lives in the shared `minarch.elf`, so it works for every console.
-- **Boot logo** `Big Mr712.bmp` with a signature; the clean variant `Big` stays available in `Settings → Boot logo`.
-- **Dedicated patcher menu** with a description of the selected item, black "Install / Remove / Exit" screens and wrap-around navigation.
-- **Grid wrap-around**: in Tools, Consoles and Collections, pressing down on the last row moves to the first one, and up on the first row moves to the last one.
-- **Search within the console**: a game-menu item (also available from the search results menu) that matches the **beginning of the game title** in the current console folder (the file extension is ignored). Back from the results returns to the search prompt with the previous query; back again returns to the game list. The keyboard shows "Поиск в консоли <console name>" (the name in white), centred hints, L1 = space, R1 = done; an empty result shows no artwork.
-- **"Continue" row at the top of a console**: the first row is that console's newest game from Recents, with its cover; A launches it the same way Recents does (loading the save state when there is one). Computed once per list, with no disk access.
-- **Version check**: if `version.txt` is not `NXRedux-v2.5.1`, the patch warns and offers to cancel (cancel is the default).
+- Boot logo changed.
+- Firmware translated into Russian.
+- The on-screen keyboard gets button control for "ПРОБЕЛ" (Space) and "ГОТОВО" (Confirm) as L1 and R1 respectively.
+- Search within a specific console's game list: in a game list press **MENU** and choose **"Поиск игр по консоли"**.
+- Continue where you left off on each console. The first row in a game list is the game you played last on that console.
+- The Tools list scrolls through the top and bottom edges (wrap-around).
 
 ## Screenshots
 
@@ -78,7 +73,7 @@ The Tools, Consoles and Collections grids wrap: down on the last row goes to the
 
 ## Compatibility
 
-- Device: **TrimUI Brick Pro** (any NextUI device with the same memory layout should work as well).
+- Device: **TrimUI Brick Pro** (any NX Redux device with the same memory layout should work as well).
 - Firmware: **NX Redux 2.5.1** (checked through `version.txt`).
 - The patch works with the **installed** binaries: nothing is downgraded, official updates keep working.
 - Official `nextui.elf` and `settings.elf` are not part of this repository — the patch is applied to the files already present on the card.
@@ -91,7 +86,7 @@ The Tools, Consoles and Collections grids wrap: down on the last row goes to the
    Roms/Ports (PORTS)/NX REDUX Mr712 Patch.sh
    Roms/Ports (PORTS)/.ports/nxredux-mr712/...
    ```
-   The folder name may be anything (`Ports`, `PORTS`, etc.): the scripts derive their path from their own file instead of a hard-coded `Ports (PORTS)`. The folder still has to be a console NextUI lists (normally `Ports (PORTS)`), with the `.sh` next to `.ports/nxredux-mr712/`.
+   The folder name may be anything (`Ports`, `PORTS`, etc.): the scripts derive their path from their own file instead of a hard-coded `Ports (PORTS)`. The folder still has to be a console NX Redux lists (normally `Ports (PORTS)`), with the `.sh` next to `.ports/nxredux-mr712/`.
 2. Insert the card into the console and power it on.
 
 > To build a ready-to-copy archive, run `build.bat` in the project root: it writes `builds/NXPatch_v1.0_for_Trimui_Brick_Pro.zip`. The archive is flat (`NX REDUX Mr712 Patch.sh` plus `.ports/`), so unpack it **into the ports console folder** — under any name (`Ports (PORTS)`, `Ports`, ...). It must be the ports console: `.sh` is launched by its emulator; in a regular console (NES, GB, ...) the file shows up but will not start.
@@ -110,7 +105,7 @@ The official `nextui.elf` and `settings.elf` are restored, the original boot log
 
 ## How It Works (For Developers)
 
-The patch does not rebuild NextUI; it edits machine code inside the ELF files.
+The patch does not rebuild NX Redux; it edits machine code inside the ELF files.
 
 ### String relocation
 
@@ -123,11 +118,11 @@ The original strings stay in the file, which is why English labels are still vis
 
 ### Tool names
 
-The Tools tab names are not compiled into the binary: NextUI reads them from `Tools/map.txt` on the card. The installer appends rows for the stock paks (`Artwork Manager.pak` → `Менеджер обложек`, etc.), keeping the original file as `map.txt.bak`; removal restores it (or deletes the file if it did not exist). This works on a clean card and on top of your own renames.
+The Tools tab names are not compiled into the binary: NX Redux reads them from `Tools/map.txt` on the card. The installer appends rows for the stock paks (`Artwork Manager.pak` → `Менеджер обложек`, etc.), keeping the original file as `map.txt.bak`; removal restores it (or deletes the file if it did not exist). This works on a clean card and on top of your own renames.
 
 ### In-game menu (`minarch.elf`)
 
-The MENU overlay is drawn by the shared frontend `minarch.elf` in `.system/bin`, not by NextUI. The patch translates its strings with the same `nxpatch` (a separate `minarch.tsv`), keeping the original as `minarch.elf.before`; removal restores it.
+The MENU overlay is drawn by the shared frontend `minarch.elf` in `.system/bin`, not by NX Redux. The patch translates its strings with the same `nxpatch` (a separate `minarch.tsv`), keeping the original as `minarch.elf.before`; removal restores it.
 
 The Frontend, Shaders, Controls and Shortcuts submenus are translated inside. For strings that double as config keys, a separate `minarch_display.tsv` table swaps only the display pointers (`labels`, shortcut names, `button_labels`); the stored values stay English, so settings and button bindings keep working and a stock build can read the configs after removal. "Core Options" is the exception: only its title is translated, the items and values come from the core. The Controls button names (A Button, A Turbo, ...) also come from the core and stay as reported.
 
@@ -181,7 +176,7 @@ The tools are cross-compiled for `aarch64-linux-musl`; the ready binary `nxpatch
 
 ## Credits
 
-The original interface and firmware belong to the NextUI and NX Redux projects. This repository contains neither of their binaries and changes nothing on the card without an explicit user command.
+The original interface and firmware belong to the NX Redux project. This repository contains none of its binaries and changes nothing on the card without an explicit user command.
 
 ## License
 

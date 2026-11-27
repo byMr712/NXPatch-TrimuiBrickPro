@@ -71,7 +71,7 @@ if [ "$cur_ver" != "$PATCH_VER" ]; then
 	esac
 fi
 
-# --- названия инструментов: Tools/map.txt (NextUI берёт его из папки Tools на карте) ---
+# --- названия инструментов: Tools/map.txt (NX Redux берёт его из папки Tools на карте) ---
 MAPSRC="$PAK/tools_map.txt"
 MAPDST="$SD/Tools/map.txt"
 if [ -f "$MAPSRC" ]; then
