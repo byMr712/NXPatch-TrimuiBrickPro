@@ -176,7 +176,7 @@ The tools are cross-compiled for `aarch64-linux-musl`; the ready binary `nxpatch
 
 ## Credits
 
-The original interface and firmware belong to the NX Redux project. This repository contains none of its binaries and changes nothing on the card without an explicit user command.
+The original interface and firmware belong to the [NX Redux](https://github.com/nx-redux/nx-handheld) project. This repository contains none of its binaries and changes nothing on the card without an explicit user command.
 
 ## License
 
