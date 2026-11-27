@@ -87,11 +87,6 @@ static int kb_built, kb_patched;
 
 /* Код-помощник для copy-сайтов контекстного меню (см. fix_label_copy).
  * x16 = dst, x17 = src, копирует до NUL; сохраняет/восстанавливает x0,x1 и флаги. */
-static const uint8_t copy_helper[] = {
-    0xe0, 0x07, 0xbf, 0xa9, 0x20, 0x16, 0x40, 0x38, 0x00, 0x16, 0x00, 0x38,
-    0xc0, 0xff, 0xff, 0x35, 0xe0, 0x07, 0xc1, 0xa8, 0xc0, 0x03, 0x5f, 0xd6
-};
-static uint64_t helper_va;
 
 static uint32_t rd32(const uint8_t *p);
 static void wr32(uint8_t *p, uint32_t v);
@@ -358,6 +353,7 @@ static int fix_grid_wrap(uint8_t *code, uint64_t len, uint64_t taddr) {
     return 0;
 }
 static int allow_relax;
+static int no_cs, no_grid, no_date, no_hint; /* отладочные переключатели фич */
 
 static void e_ldrb_reg(int rt, int rn, int rm) {
     cb32(0x38600800u | ((uint32_t)rm << 16) | (3u << 13) | ((uint32_t)rn << 5) | (uint32_t)rt);
@@ -1363,6 +1359,45 @@ static int patch_console_search(void) {
 }
 
 /*
+ * Копирование до NUL вместо встроенной копии фиксированной длины.
+ *
+ * Вызывать помощника через bl нельзя: часть сайтов лежит в leaf-функциях
+ * (например rootItems), которые не сохраняют LR — bl затирает адрес возврата
+ * и функция уходит в мусор (падение при MENU на консоли/коллекции).
+ * Поэтому на сайте стоит b trampoline, а в кейве — цикл копирования,
+ * который сохраняет только x9/x10 и не трогает LR.
+ *
+ * dst_base: регистр-база приёмника; dst_index >= 0 — add x16, base, index,
+ * иначе mov x16, base (+ dst_imm, если задан); src: регистр источника.
+ */
+static int tramp_copy_site(uint8_t *p, uint64_t site_va, int dst_base, int dst_index, uint32_t dst_imm, int src) {
+    while (cave_len % 8) cave[cave_len++] = 0;
+    if (cave_len + 64 > max_cave) return 0;
+    cb_off = cave_len;
+    uint64_t tramp = cave_vaddr + cb_off;
+    cb32(0xA9BF2BE9u); /* stp x9, x10, [sp, #-16]! */
+    if (dst_index >= 0) cb32(enc_add_x(16, dst_base, dst_index));
+    else {
+        cb32(enc_mov_x(16, dst_base));
+        if (dst_imm) cb32(0x91000000u | ((dst_imm & 0xFFF) << 10) | ((uint32_t)dst_base << 5) | 16u);
+    }
+    if (src != 17) cb32(enc_mov_x(17, src));
+    cb32(0x38401629u); /* ldrb w9, [x17], #1 */
+    cb32(0x38001609u); /* strb w9, [x16], #1 */
+    cb32(0x35FFFFC9u); /* cbnz w9, .-8 */
+    cb32(0xA8C12BE9u); /* ldp x9, x10, [sp], #16 */
+    e_b(site_va + 16);
+    cave_len = cb_off;
+    uint32_t b = enc_b(site_va, tramp);
+    if (!b) return 0;
+    wr32(p, b);
+    wr32(p + 4, 0xD503201Fu);
+    wr32(p + 8, 0xD503201Fu);
+    wr32(p + 12, 0xD503201Fu);
+    return 1;
+}
+
+/*
  * Компилятор развернул addItem(..., "литерал", id) в копию фиксированной длины
  * (strlen(литерала)+1 байт) — при подмене литерала на длинную русскую строку
  * метка обрезается посреди UTF-8. Находим такую копию (4 инструкции подряд:
@@ -1370,7 +1405,6 @@ static int patch_console_search(void) {
  * помощника, который копирует до NUL.
  */
 static int fix_label_copy(uint64_t add_addr, int R, size_t en_len) {
-    if (!helper_va) return 0;
     for (int i = 1; i <= 6; i++) {
         uint64_t a = add_addr + (uint64_t)i * 4;
         uint8_t *p0 = file_ptr(a, 16);
@@ -1434,18 +1468,9 @@ static int fix_label_copy(uint64_t add_addr, int R, size_t en_len) {
             if (!okid) continue;
         }
 
-        uint32_t ins[4];
-        int n = 0;
-        ins[n++] = (dindex >= 0) ? enc_add_x(16, dbase, dindex) : enc_mov_x(16, dbase);
-        if (R != 17) ins[n++] = enc_mov_x(17, R);
-        uint32_t bl = enc_bl(a + (uint64_t)n * 4, helper_va);
-        if (!bl) continue;
-        ins[n++] = bl;
-        while (n < 4) ins[n++] = 0xD503201Fu; /* nop */
-
         uint8_t *p = file_ptr(a, 16);
         if (!p) continue;
-        for (int j = 0; j < 4; j++) wr32(p + j * 4, ins[j]);
+        if (!tramp_copy_site(p, a, dbase, dindex, 0, R)) continue;
         if (getenv("NXPATCH_VERBOSE"))
             fprintf(stderr, "copy site %llx literal %u bytes\n", (unsigned long long)a, (unsigned)en_len);
         return 1;
@@ -1459,7 +1484,6 @@ static int fix_label_copy(uint64_t add_addr, int R, size_t en_len) {
  * The destination is when[64]: replace the four load/store instructions with a call
  * to the copy_helper (copies to NUL), keeping the already-patched adrp+add source. */
 static int patch_date_copies(void) {
-    if (!helper_va) return 0;
     static const struct {
         uint64_t va;
         uint32_t sig[4];
@@ -1480,12 +1504,7 @@ static int patch_date_copies(void) {
         for (int j = 0; j < 4; j++)
             if (rd32(p + j * 4) != sites[i].sig[j]) { ok = 0; break; }
         if (!ok) continue;
-        uint32_t bl = enc_bl(pc + 8, helper_va);
-        if (!bl) continue;
-        wr32(p, enc_mov_x(17, 0));
-        wr32(p + 4, 0x9101C3F0u); /* add x16, sp, #0x70: copy_helper's dst */
-        wr32(p + 8, bl);
-        wr32(p + 12, 0xD503201Fu);
+        if (!tramp_copy_site(p, pc, 31, -1, 0x70, 0)) continue;
         if (getenv("NXPATCH_VERBOSE"))
             fprintf(stderr, "date copy site %llx\n", (unsigned long long)pc);
         n++;
@@ -1937,6 +1956,10 @@ int main(int argc, char **argv) {
         if (!strcmp(argv[a], "--relax")) allow_relax = 1;
         else if (!strcmp(argv[a], "--minarch-display") && a + 1 < argc) disp_file = argv[++a];
         else if (!strcmp(argv[a], "--settings-entry")) se_entry = 1;
+        else if (!strcmp(argv[a], "--no-cs")) no_cs = 1;
+        else if (!strcmp(argv[a], "--no-grid")) no_grid = 1;
+        else if (!strcmp(argv[a], "--no-date")) no_date = 1;
+        else if (!strcmp(argv[a], "--no-hint")) no_hint = 1;
     }
 
     FILE *f = fopen(argv[1], "rb");
@@ -2123,12 +2146,6 @@ int main(int argc, char **argv) {
     /* ---- код-помощник для copy-сайтов контекстного меню ---- */
     size_t cave_len_strings = cave_len;
     while (cave_len % 8) cave[cave_len++] = 0;
-    helper_va = 0;
-    if (cave_len + sizeof(copy_helper) <= max_cave) {
-        memcpy(cave + cave_len, copy_helper, sizeof(copy_helper));
-        helper_va = cave_vaddr + cave_len;
-        cave_len += sizeof(copy_helper);
-    }
 
     /* ---- заглушки зацикливания сетки ---- */
     grid_up_va = grid_down_va = 0;
@@ -2148,8 +2165,8 @@ int main(int argc, char **argv) {
 
     /* ---- «Поиск игры в консоли»: пункт меню, обработчик, фильтр ---- */
 #ifdef CS_CONSOLE_SEARCH
-    cs_built = build_console_search();
-    kb_built = cs_built ? build_kb_tweaks() : 0;
+    cs_built = no_cs ? 0 : build_console_search();
+    kb_built = (cs_built && !no_cs) ? build_kb_tweaks() : 0;
 #endif
 
 
@@ -2300,15 +2317,15 @@ int main(int argc, char **argv) {
         }
     }
 
-    date_copies = patch_date_copies();
-    int select_hint = patch_select_hint(text->addr);
+    date_copies = no_date ? 0 : patch_date_copies();
+    int select_hint = no_hint ? 0 : patch_select_hint(text->addr);
 
     /* ---- insert ---- */
     if (se_entry) {
         if (!build_se_parts()) die("cave overflow (settings entry)");
         if (!apply_settings_entry()) die("settings entry: call site not found (другая прошивка?)");
     }
-    grid_wrapped = fix_grid_wrap(code, code_len, text->addr);
+    grid_wrapped = no_grid ? 0 : fix_grid_wrap(code, code_len, text->addr);
     cs_patched = cs_built ? patch_console_search() : 0;
     kb_patched = kb_built ? patch_kb_tweaks() : 0;
     if (copies == 0 && !grid_wrapped && !cs_patched && !date_copies && !select_hint && !se_entry) cave_len = cave_len_strings; /* кейв не понадобился */
