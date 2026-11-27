@@ -9,6 +9,7 @@ PAK="$(cd "$(dirname "$0")" 2>/dev/null && pwd)"
 [ -n "$PAK" ] || PAK="$SD/Roms/Ports (PORTS)/.ports/nxredux-mr712"
 LOG="$SD/Images/Bootlogo/Mr712_patch.log"
 BIN="$SD/.system/bin/nextui.elf"
+MINARCH="$SD/.system/bin/minarch.elf"
 TOOLS="$SD/.system/paks/Tools"
 SETPAK="$TOOLS/ Настройки.pak"
 [ -d "$SETPAK" ] || SETPAK="$TOOLS/Settings.pak"
@@ -151,6 +152,18 @@ if [ -f "$SETELF" ]; then
 	fi
 else
 	log "settings.elf не найден — перевод настроек пропущен"
+fi
+
+# --- minarch.elf (внутриигровое меню всех эмуляторов) ---
+if [ -f "$MINARCH" ] && [ -f "$PAK/minarch.tsv" ]; then
+	if patch_into "$MINARCH" "$PAK/minarch.tsv" /tmp/nx_minarch.elf --relax; then
+		cp "$MINARCH" "$PAK/minarch.elf.before" 2>> "$LOG"
+		cp /tmp/nx_minarch.elf "$MINARCH" && sync && log "minarch.elf пропатчен на лету"
+		rm -f /tmp/nx_minarch.elf
+	else
+		rc=$?
+		if [ "$rc" = "2" ]; then log "minarch.elf уже пропатчен"; else log "ОШИБКА: nxpatch minarch rc=$rc"; fi
+	fi
 fi
 
 # --- логотип в загрузчик ---

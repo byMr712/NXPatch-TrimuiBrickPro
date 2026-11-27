@@ -1,0 +1,146 @@
+# English	Russian
+Continue	Продолжить
+Save	Сохранить
+Load	Загрузить
+Options	Опции
+Quit	Выход
+Reset	Сброс
+Frontend	Оболочка
+Core Options	Опции ядра
+Shaders	Шейдеры
+Cheats	Читы
+Controls	Управление
+Shortcuts	Сочетания
+Achievements	Достижения
+Save Changes	Сохранить настройки
+Screen Scaling	Масштаб экрана
+Audio Resampling Quality	Качество ресемплинга
+Ambient Mode	Режим подсветки
+Screen Effect	Эффект экрана
+Overlay	Оверлей
+Offset screen X	Смещение экрана X
+Offset screen Y	Смещение экрана Y
+Screen Sharpness	Чёткость экрана
+Core Sync	Синхронизация ядра
+CPU Speed	Частота CPU
+Debug HUD	Отладка (HUD)
+Max FF Speed	Макс. скорость перемотки
+Fast forward audio	Звук при перемотке
+Rewind	Обратная отмотка
+Rewind Buffer (MB)	Буфер отмотки (МБ)
+Rewind Interval	Интервал отмотки
+Rewind Compression	Сжатие отмотки
+Rewind Compression Speed	Скорость сжатия
+Rewind audio	Звук при отмотке
+Resampling quality higher takes more CPU	Чем выше качество, тем больше нагрузка на CPU
+Makes your leds follow on screen colors	Подсветка повторяет цвета экрана
+Grid simulates an LCD grid.\nLine simulates CRT scanlines.\nEffects usually look best at native scaling.	Grid рисует сетку LCD.\nLine — строки CRT.\nЛучше всего при родном масштабе.
+Choose a custom overlay png from the Overlays folder	Свой PNG-оверлей из папки Overlays
+Offset X pixels	Смещение по X в пикселях
+Offset Y pixels	Смещение по Y в пикселях
+LINEAR smooths lines, but works better when final image is at higher resolution, so either core that outputs higher resolution or upscaling with shaders	LINEAR сглаживает линии, но лучше работает при высоком разрешении — нативном или с шейдерами
+Choose what should be used as a\nreference for the frame rate.\n"Native" uses the emulator frame rate,\n"Screen" uses the frame rate of the screen,\n"Emulated" follows the game's own timing\n(GPU cores).	Что использовать для частоты кадров:\n«Native» — частоту эмулятора,\n«Screen» — частоту экрана,\n«Emulated» — тайминг игры\n(GPU-ядра).
+Over- or underclock the CPU to prioritize\npure performance or power savings.	Разгон или андерклок CPU:\nпроизводительность или экономия.
+Show frames per second, cpu load,\nresolution, and scaler information.	Показывать FPS, нагрузку CPU,\nразрешение и данные масштабирования.
+Fast forward will not exceed the\nselected speed (but may be less\ndepending on game and emulator).	Перемотка не превысит выбранную\nскорость (может быть ниже\nв зависимости от игры и эмулятора).
+Play or mute audio when fast forwarding.	Звук при перемотке вперёд.
+Enable in-memory rewind buffer.\nMust set a shortcut to access rewind during gameplay.\nUses extra CPU and memory.	Буфер обратной отмотки в памяти.\nНужно назначить сочетание кнопок.\nТребует CPU и память.
+Memory reserved for rewind snapshots.\nIncrease for longer rewind times.	Память для снимков отмотки.\nБольше — длиннее отмотка.
+Interval between rewind snapshots.\nShorter intervals improve smoothness during rewind,\nbut increase CPU and memory usage.	Интервал между снимками отмотки.\nКороче — плавнее, но больше нагрузка.
+Compress rewind snapshots to save memory at the cost of CPU.	Сжимать снимки отмотки, экономя память ценой CPU.
+LZ4 acceleration used for rewind snapshots.\nLower values compress more but use more CPU.	Ускорение LZ4 для снимков отмотки.\nМеньше — сильнее сжатие, больше CPU.
+Play or mute audio when rewinding.	Звук при обратной отмотке.
+Native uses integer scaling.\nAspect uses core reported aspect ratio.\nAspect screen uses screen aspect ratio\nFullscreen has non-square pixels.	Native — целочисленный масштаб.\nAspect — соотношение сторон ядра.\nAspect Screen — соотношение экрана.\nFullscreen — неквадратные пиксели.
+Optional Shaders Settings	Доп. настройки шейдеров
+Shader / Emulator Settings Preset	Пресет шейдеров/эмулятора
+Number of Shaders	Количество шейдеров
+Shader 1	Шейдер 1
+Shader 1 Filter	Фильтр шейдера 1
+Shader 1 Source type	Источник шейдера 1
+Shader 1 Texture Type	Тип текстуры шейдера 1
+Shader 1 Scale	Масштаб шейдера 1
+Shader 2	Шейдер 2
+Shader 2 Filter	Фильтр шейдера 2
+Shader 2 Source type	Источник шейдера 2
+Shader 2 Texture Type	Тип текстуры шейдера 2
+Shader 2 Scale	Масштаб шейдера 2
+Shader 3	Шейдер 3
+Shader 3 Filter	Фильтр шейдера 3
+Shader 3 Source type	Источник шейдера 3
+Shader 3 Texture Type	Тип текстуры шейдера 3
+Shader 3 Scale	Масштаб шейдера 3
+If shaders have extra settings they will show up in this settings menu	Доп. настройки шейдеров появятся здесь
+Load a premade shaders/emulators config.\nTo try out a preset, exit the game without saving settings!	Загрузить готовый пресет шейдеров/эмулятора.\nЧтобы примерить, выйдите без сохранения настроек!
+Number of shaders 1 to 3	Количество шейдеров: от 1 до 3
+Shader 1 program to run	Программа шейдера 1
+Shader 2 program to run	Программа шейдера 2
+Shader 3 program to run	Программа шейдера 3
+Method of upscaling, NEAREST or LINEAR	Метод масштабирования: NEAREST или LINEAR
+This will choose resolution source to scale from	Источник разрешения для масштабирования
+This will scale images x times,\nscreen scales to screens resolution (can hit performance)	Масштаб изображения в N раз;\n«screen» — до разрешения экрана (может снизить FPS)
+No shaders available\n/Shaders folder or shader files not found	Шейдеры не найдены:\nпапка /Shaders пуста или отсутствует
+No extra settings found	Доп. настроек нет
+Shader Settings	Настройки шейдеров
+Controller	Геймпад
+Select the type of controller.	Тип геймпада.
+Restore defaults	Сбросить настройки
+Restored defaults.	Настройки сброшены.
+Restored console defaults.	Настройки консоли сброшены.
+Using console config.	Используется настройка консоли.
+Using game config.	Используется настройка игры.
+Using defaults.	Значения по умолчанию.
+Set for this console/game. X: use Settings' shortcut.	Задано для консоли/игры. X — как в настройках.
+Settings' button for it is used by another shortcut here.	Эта кнопка уже занята другим сочетанием.
+Overrides Settings > Emulator Shortcuts.	Переопределяет «Сочетания» в настройках.
+From Settings > Emulator Shortcuts.	Из «Сочетаний» в настройках.
+Supports single button and MENU+button.	Можно одну кнопку или MENU+кнопку.
+Save for console	Сохранить для консоли
+Save for game	Сохранить для игры
+Saved for console.	Сохранено для консоли.
+Saved for game.	Сохранено для игры.
+This category has no options.	В этой категории нет настроек.
+This core has no options that\ncan be changed while running.	У ядра нет настроек,\nизменяемых на ходу.
+Cheats disabled in Hardcore mode	Читы отключены в режиме Hardcore
+Achievement list not available	Список достижений недоступен
+No achievements found	Достижения не найдены
+No achievements yet	Пока нет достижений
+This game has no achievements yet	У этой игры пока нет достижений
+No game loaded for achievements	Игра не загружена
+Game not recognized	Игра не распознана
+RetroAchievements doesn't recognize\nthis game file. Use a supported\ndump listed on retroachievements.org.	RetroAchievements не распознаёт\nэтот файл. Используйте проверенный\nдамп с retroachievements.org.
+Unknown Game	Неизвестная игра
+Empty Slot	Пустой слот
+(none)	(нет)
+Load Failed - Wrong Disc	Ошибка: не тот диск
+Load State Undone	Загрузка отменена
+Nothing To Undo	Нечего отменять
+Failed to capture screenshot	Не удалось сделать скриншот
+Screenshot saved	Скриншот сохранён
+Leave netplay?	Выйти из сетевой игры?
+Leaving ends the netplay session.	Сессия будет завершена.
+MUTED: Will not show in notifications	БЕЗ ЗВУКА: не показывать в уведомлениях
+BACK	НАЗАД
+CLEAR	ОЧИСТИТЬ
+CONTINUE	ПРОДОЛЖИТЬ
+LEAVE	ВЫЙТИ
+OKAY	ОК
+QUIT	ВЫХОД
+SAVE & QUIT	СОХР. И ВЫЙТИ
+UNDO LOAD	ОТМЕНИТЬ ЗАГРУЗКУ
+SHOW ALL	ВСЕ
+SHOW LOCKED	ЗАКРЫТЫЕ
+MUTE	БЕЗ ЗВУКА
+UNMUTE	СО ЗВУКОМ
+LOAD	ЗАГРУЗИТЬ
+Connecting to RetroAchievements...	Подключение к RetroAchievements...
+Connecting...	Подключение...
+Connection failed	Ошибка подключения
+RetroAchievements: Connection failed	RetroAchievements: ошибка подключения
+RetroAchievements: Reconnected	RetroAchievements: подключено
+RetroAchievements: offline (softcore)	RetroAchievements: офлайн (softcore)
+RetroAchievements: offline, unlocks will sync later	RetroAchievements: офлайн, синхронизация позже
+Game Mastered!	Игра пройдена!
+Press A to set and X to clear.\nSupports single button and MENU+button.	A — назначить, X — очистить.\nМожно одну кнопку или MENU+кнопку.
+Press A to set and X to clear.\nOverrides Settings > Emulator Shortcuts.	A — назначить, X — очистить.\nПереопределяет «Сочетания» в настройках.
+No cheat file loaded.\nGet cheats from Xtras > Cheat Database.\n\n	Файл читов не загружен.\nЧиты — в «Дополнения > База читов».\n\n
+Cheats: the core exposes no system RAM, RAM cheats can't apply\n	Ядро не даёт доступ к RAM — читы RAM недоступны\n

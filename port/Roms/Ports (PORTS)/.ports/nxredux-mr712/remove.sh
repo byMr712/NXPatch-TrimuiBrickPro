@@ -7,6 +7,7 @@ PAK="$(cd "$(dirname "$0")" 2>/dev/null && pwd)"
 [ -n "$PAK" ] || PAK="$SD/Roms/Ports (PORTS)/.ports/nxredux-mr712"
 LOG="$SD/Images/Bootlogo/Mr712_patch.log"
 BIN="$SD/.system/bin/nextui.elf"
+MINARCH="$SD/.system/bin/minarch.elf"
 TOOLS="$SD/.system/paks/Tools"
 SETPAK="$TOOLS/ Настройки.pak"
 [ -d "$SETPAK" ] || SETPAK="$TOOLS/Settings.pak"
@@ -35,6 +36,9 @@ restore() { # $1 = current, $2 = .before, $3 = .orig
 restore "$BIN" "$PAK/nextui.elf.before" "$PAK/nextui.elf.orig"
 if [ -f "$SETELF" ]; then
 	restore "$SETELF" "$PAK/settings.elf.before" "$PAK/settings.elf.orig"
+fi
+if [ -f "$MINARCH" ]; then
+	restore "$MINARCH" "$PAK/minarch.elf.before" "$PAK/minarch.elf.orig"
 fi
 
 # вернуть папке штатное имя, если снимаем патч вместе с ней
