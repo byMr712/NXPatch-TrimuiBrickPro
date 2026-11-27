@@ -137,11 +137,12 @@ if is_old "$cur" "$OLD_NEXTUI" && [ -f "$PAK/nextui.elf.orig" ]; then
 	log "nextui.elf — старая сборка ($cur), основа: nextui.elf.orig"
 fi
 if [ -f "$base" ]; then
+	# свежий официальный бинарник (без наших меток, например после обновления
+	# прошивки) — обновляем копию для отката, иначе оставляем прежнюю
+	if ! grep -q 'Mr712RU' "$BIN" 2>/dev/null; then
+		cp "$BIN" "$PAK/nextui.elf.before" 2>> "$LOG" && log "nextui.elf: копия официального файла обновлена"
+	fi
 	if patch_into "$base" "$PAK/nextui.tsv" /tmp/nx_nextui.elf --relax; then
-		# запоминаем то, что реально стояло (первый раз): по нему идёт откат
-		if [ ! -f "$PAK/nextui.elf.before" ] && ! is_old "$cur" "$OLD_NEXTUI"; then
-			cp "$BIN" "$PAK/nextui.elf.before" 2>> "$LOG"
-		fi
 		cp /tmp/nx_nextui.elf "$BIN" && sync && log "nextui.elf пропатчен на лету"
 		rm -f /tmp/nx_nextui.elf
 	else
@@ -182,8 +183,11 @@ fi
 
 # --- minarch.elf (внутриигровое меню всех эмуляторов) ---
 if [ -f "$MINARCH" ] && [ -f "$PAK/minarch.tsv" ]; then
+	# официальный бинарник (например после обновления прошивки) — обновляем копию
+	if ! grep -q 'Mr712RU' "$MINARCH" 2>/dev/null; then
+		cp "$MINARCH" "$PAK/minarch.elf.before" 2>> "$LOG" && log "minarch.elf: копия официального файла обновлена"
+	fi
 	if "$PATCHER" "$MINARCH" /tmp/nx_minarch.elf "$PAK/minarch.tsv" --relax --minarch-display "$PAK/minarch_display.tsv" >> "$LOG" 2>&1; then
-		[ -f "$PAK/minarch.elf.before" ] || cp "$MINARCH" "$PAK/minarch.elf.before" 2>> "$LOG"
 		cp /tmp/nx_minarch.elf "$MINARCH" && sync && log "minarch.elf пропатчен на лету"
 		rm -f /tmp/nx_minarch.elf
 	else

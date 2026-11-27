@@ -36,6 +36,12 @@ fi
 
 restore() { # $1 = current, $2 = .before, $3 = .orig, $4 = keep backup
 	if [ -f "$2" ]; then
+		# не заливаем старый бэкап поверх свежего файла (например после
+		# обновления прошивки): восстанавливаем только свой пропатченный
+		if ! grep -q 'Mr712RU' "$1" 2>/dev/null && ! grep -q 'Mr712MENU' "$1" 2>/dev/null; then
+			log "$(basename "$1"): патча нет (обновление прошивки?) — файл не трогаем"
+			return 0
+		fi
 		cp "$2" "$1" && sync
 		[ "$4" = "1" ] || rm -f "$2"
 		log "восстановлен $(basename "$1") из $(basename "$2")"
@@ -53,20 +59,24 @@ restore() { # $1 = current, $2 = .before, $3 = .orig, $4 = keep backup
 
 restore "$BIN" "$PAK/nextui.elf.before" "$PAK/nextui.elf.orig"
 if [ -f "$SETELF" ]; then
-	# settings.elf.before не удаляем: из него install.sh собирает перевод заново
-	restore "$SETELF" "$PAK/settings.elf.before" "$PAK/settings.elf.orig" 1
-	# пункт «NX Redux Patch» в настройках остаётся и после снятия перевода
-	if ! grep -q 'Mr712MENU' "$SETELF" 2>/dev/null; then
-		chmod +x "$PATCHER" 2>/dev/null
-		if "$PATCHER" "$SETELF" /tmp/nx_se.elf --settings-entry >> "$LOG" 2>&1; then
-			if cp /tmp/nx_se.elf "$SETELF.new" && mv -f "$SETELF.new" "$SETELF"; then
-				sync
-				log "пункт NX Redux Patch оставлен в настройках"
+	if grep -q 'Mr712RU' "$SETELF" 2>/dev/null || grep -q 'Mr712MENU' "$SETELF" 2>/dev/null; then
+		# settings.elf.before не удаляем: из него install.sh собирает перевод заново
+		restore "$SETELF" "$PAK/settings.elf.before" "$PAK/settings.elf.orig" 1
+		# пункт «NX Redux Patch» в настройках остаётся и после снятия перевода
+		if ! grep -q 'Mr712MENU' "$SETELF" 2>/dev/null; then
+			chmod +x "$PATCHER" 2>/dev/null
+			if "$PATCHER" "$SETELF" /tmp/nx_se.elf --settings-entry >> "$LOG" 2>&1; then
+				if cp /tmp/nx_se.elf "$SETELF.new" && mv -f "$SETELF.new" "$SETELF"; then
+					sync
+					log "пункт NX Redux Patch оставлен в настройках"
+				fi
+			else
+				log "ВНИМАНИЕ: пункт в настройках не добавлен (rc=$?)"
 			fi
-		else
-			log "ВНИМАНИЕ: пункт в настройках не добавлен (rc=$?)"
+			rm -f /tmp/nx_se.elf "$SETELF.new"
 		fi
-		rm -f /tmp/nx_se.elf "$SETELF.new"
+	else
+		log "settings.elf: патча нет (обновление прошивки?) — файл не трогаем"
 	fi
 fi
 if [ -f "$MINARCH" ]; then

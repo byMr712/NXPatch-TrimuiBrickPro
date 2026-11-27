@@ -98,7 +98,7 @@ The patcher sits at the very bottom of **Settings** — installing and removing 
 From then on the patcher starts from **Settings** (the bottom row). The row stays after removing the translation, so the patch can be reinstalled at any time.
 
 > In Simple Mode the Tools tab is hidden — turn Simple Mode off first.
-> A firmware update replaces the settings app and the row disappears: extract the archive again and the Tools shortcut comes back.
+> A firmware update replaces the system files and the row disappears: extract the archive again and install the patch once more — the rollback copies are refreshed automatically. Games, saves, settings, collections and `Tools/.nxredux` are not touched by the update; pressing Remove patch after an update is safe — the old backups are never written over the new firmware.
 > If the previous Ports-based version is still on the card, its files are cleaned up on the first install — the backups are carried over into the pak.
 
 Safety: the first run stores `nextui.elf.before`, `settings.elf.before` and `minarch.elf.before`; the rollback uses them.
