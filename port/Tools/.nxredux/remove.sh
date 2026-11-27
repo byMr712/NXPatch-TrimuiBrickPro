@@ -82,12 +82,17 @@ fi
 
 # названия инструментов: вернуть исходный Tools/map.txt
 MAPDST="$SD/Tools/map.txt"
-if [ -f "$MAPDST.bak" ]; then
-	if cp "$MAPDST.bak" "$MAPDST"; then
-		rm -f "$MAPDST.bak"
-		sync
-		log "map.txt: исходная копия восстановлена"
+MAPORIG="$SD/Tools/map.txt.orig"
+if [ -f "$MAPORIG" ]; then
+	if [ -s "$MAPORIG" ]; then
+		if cp "$MAPORIG" "$MAPDST"; then
+			sync
+			log "map.txt: исходные названия восстановлены"
+		fi
+	else
+		rm -f "$MAPDST" && sync && log "map.txt: удалён"
 	fi
+	rm -f "$MAPORIG"
 elif [ -f "$PAK/tools_map.txt" ] && [ -f "$MAPDST" ]; then
 	awk -F'\t' 'NR==FNR { skip[$1]=1; next } !($1 in skip)' "$PAK/tools_map.txt" "$MAPDST" > /tmp/nx_tools_map.txt 2>> "$LOG"
 	if [ -s /tmp/nx_tools_map.txt ]; then
@@ -96,6 +101,19 @@ elif [ -f "$PAK/tools_map.txt" ] && [ -f "$MAPDST" ]; then
 		rm -f "$MAPDST" && sync && log "map.txt: удалён"
 	fi
 	rm -f /tmp/nx_tools_map.txt
+fi
+rm -f "$MAPDST.bak"
+
+# штатный launch.sh настроек: вернуть строку cd без кавычек (её меняли старые версии)
+if [ -f "$SETPAK/launch.sh" ] && grep -qx 'cd "$(dirname "$0")"' "$SETPAK/launch.sh" 2>/dev/null; then
+	sed -i 's|^cd "$(dirname "$0")"$|cd $(dirname "$0")|' "$SETPAK/launch.sh" 2>> "$LOG" && log "launch.sh настроек: строка cd возвращена"
+fi
+
+# логотип «без подписи», который патч добавлял в список Settings
+if [ -d "$LOGO_DIR" ] && [ -f "$LOGO_DIR/Big.bmp" ] && [ -f "$PAK/Big.bmp" ]; then
+	if cmp -s "$LOGO_DIR/Big.bmp" "$PAK/Big.bmp"; then
+		rm -f "$LOGO_DIR/Big.bmp" && sync && log "логотип из списка Settings убран"
+	fi
 fi
 
 # логотип загрузчика
@@ -119,7 +137,7 @@ if [ -f "$PAK/bootlogo_before.bmp" ]; then
 	fi
 fi
 
-# логотипы в списке Settings остаются (в т.ч. без подписи)
+# логотипы в списке Settings: убран только добавленный патчем (см. выше)
 
 log "готово, перезагрузка"
 sync

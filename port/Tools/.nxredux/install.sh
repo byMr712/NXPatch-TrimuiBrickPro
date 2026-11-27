@@ -86,18 +86,23 @@ if [ "$cur_ver" != "$PATCH_VER" ]; then
 fi
 
 # --- названия инструментов: Tools/map.txt (NX Redux берёт его из папки Tools на карте) ---
+# map.txt.orig — копия БЕЗ наших строк; её и восстанавливает remove.sh.
+# Так откат не зависит от того, что лежало в map.txt в момент установки.
 MAPSRC="$PAK/tools_map.txt"
 MAPDST="$SD/Tools/map.txt"
+MAPORIG="$SD/Tools/map.txt.orig"
 if [ -f "$MAPSRC" ]; then
 	mkdir -p "$SD/Tools"
-	if [ -f "$MAPDST" ] && [ ! -f "$MAPDST.bak" ]; then
-		cp "$MAPDST" "$MAPDST.bak" 2>> "$LOG" && log "map.txt: сохранена исходная копия"
+	if [ ! -f "$MAPORIG" ]; then
+		if [ -f "$MAPDST" ]; then
+			awk -F'\t' 'NR==FNR { skip[$1]=1; next } !($1 in skip)' "$MAPSRC" "$MAPDST" > /tmp/nx_tools_map.txt 2>> "$LOG"
+		else
+			: > /tmp/nx_tools_map.txt
+		fi
+		cp /tmp/nx_tools_map.txt "$MAPORIG" 2>> "$LOG" && log "map.txt: сохранены исходные названия"
+		rm -f /tmp/nx_tools_map.txt
 	fi
-	if [ -f "$MAPDST" ]; then
-		awk -F'\t' 'NR==FNR { skip[$1]=1; next } !($1 in skip)' "$MAPSRC" "$MAPDST" > /tmp/nx_tools_map.txt 2>> "$LOG"
-	else
-		: > /tmp/nx_tools_map.txt
-	fi
+	cp "$MAPORIG" /tmp/nx_tools_map.txt 2>> "$LOG"
 	cat "$MAPSRC" >> /tmp/nx_tools_map.txt
 	if cp /tmp/nx_tools_map.txt "$MAPDST"; then
 		sync
@@ -105,7 +110,7 @@ if [ -f "$MAPSRC" ]; then
 	else
 		log "ОШИБКА: не удалось записать map.txt"
 	fi
-	rm -f /tmp/nx_tools_map.txt
+	rm -f /tmp/nx_tools_map.txt "$MAPDST.bak"
 fi
 
 # --- папка настроек: как в оригинале (Settings.pak); если осталась переименованная — вернуть ---
@@ -118,9 +123,8 @@ SETPAK="$TOOLS/Settings.pak"
 SETELF="$SETPAK/settings.elf"
 LOGO_DIR="$SETPAK/bootlogo/brick"
 
-# в штатном launch.sh cd без кавычек — с пробелом в имени папки он ломается
+# штатный launch.sh настроек не трогаем: папка теперь всегда Settings.pak (без пробела)
 if [ -f "$SETPAK/launch.sh" ]; then
-	sed -i 's|^cd \$(dirname "\$0")|cd "$(dirname "$0")"|' "$SETPAK/launch.sh" 2>> "$LOG" && log "launch.sh настроек: cd с кавычками"
 	chmod +x "$SETPAK/launch.sh" 2>/dev/null
 fi
 

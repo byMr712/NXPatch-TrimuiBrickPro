@@ -109,7 +109,7 @@ Safety: the first run stores `nextui.elf.before`, `settings.elf.before` and `min
 2. Choose **Remove patch**.
 3. Reboot.
 
-The official `nextui.elf`, `settings.elf` and `minarch.elf` are restored, the original boot logo and the Settings folder name are returned. Logos added to the Settings list are kept, and so is the **NX Redux Patch** row.
+Everything the patch adds is rolled back: the official `nextui.elf`, `settings.elf` and `minarch.elf`, the original boot logo, the Russian tool names (`Tools/map.txt` goes back to your own file or is deleted) and the logo the patch added to the Settings list. Only the **NX Redux Patch** row at the bottom of Settings stays, so the patch can be installed again from there.
 
 ## How It Works (For Developers)
 
