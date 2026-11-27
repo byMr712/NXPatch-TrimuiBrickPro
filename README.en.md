@@ -73,11 +73,9 @@ The Tools, Consoles and Collections grids wrap: down on the last row goes to the
 
 ## Compatibility
 
-- Device: **TrimUI Brick Pro** (any NX Redux device with the same memory layout should work as well).
-- Firmware: **NX Redux 2.5.1** (checked through `version.txt`).
-- The patch works with the **installed** binaries: nothing is downgraded, official updates keep working.
-- Official `nextui.elf` and `settings.elf` are not part of this repository — the patch is applied to the files already present on the card.
-- The translation is version independent: strings are located by content. Code changes (grid wrap, console search, the "Continue" row) are build specific and are simply skipped on another version.
+- Device: **TrimUI Brick Pro**.
+- Firmware: **NX Redux 2.5.1**.
+- The patch works with the **installed** binaries.
 
 ## Installation
 
