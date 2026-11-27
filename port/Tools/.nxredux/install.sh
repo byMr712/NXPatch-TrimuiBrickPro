@@ -221,6 +221,11 @@ if [ -d "$LOGO_DIR" ]; then
 	fi
 fi
 
+# --- ярлык в «Инструментах» нужен только до установки ---
+if grep -q 'Mr712RU' "$BIN" 2>/dev/null && [ -d "$SD/Tools/NX Redux Patch.pak" ]; then
+	rm -rf "$SD/Tools/NX Redux Patch.pak" 2>> "$LOG" && log "ярлык в Инструментах скрыт"
+fi
+
 log "готово, перезагрузка"
 sync
 sleep 1

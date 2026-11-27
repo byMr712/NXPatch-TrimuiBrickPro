@@ -91,7 +91,7 @@ The patcher sits at the very bottom of **Settings** — installing and removing 
    ```
 2. Insert the card into the console and power it on.
 3. Open **Tools → NX Redux Patch**.
-4. The patcher adds an **NX Redux Patch** row at the very bottom of **Settings** and removes its Tools shortcut.
+4. The patcher adds an **NX Redux Patch** row at the very bottom of **Settings**. The Tools shortcut stays for now and goes away once the patch is installed.
 5. Choose **Install patch** and confirm.
 6. Wait for "Done" and reboot.
 
