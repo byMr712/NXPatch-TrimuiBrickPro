@@ -1,6 +1,6 @@
 > **Language:** [Русский](README.md) · English
 
-# [MR] NX Redux Patch (RU)
+# NX Redux Patch
 
 ![Platform](https://img.shields.io/badge/Platform-TrimUI_Brick_Pro-blue.svg)
 ![NX Redux](https://img.shields.io/badge/NX_Redux-2.5.1-blue.svg)
