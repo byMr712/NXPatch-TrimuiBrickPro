@@ -76,8 +76,8 @@ MAPSRC="$PAK/tools_map.txt"
 MAPDST="$SD/Tools/map.txt"
 if [ -f "$MAPSRC" ]; then
 	mkdir -p "$SD/Tools"
-	if [ -f "$MAPDST" ] && [ ! -f "$MAPDST.mr712.bak" ]; then
-		cp "$MAPDST" "$MAPDST.mr712.bak" 2>> "$LOG" && log "map.txt: сохранена исходная копия"
+	if [ -f "$MAPDST" ] && [ ! -f "$MAPDST.bak" ]; then
+		cp "$MAPDST" "$MAPDST.bak" 2>> "$LOG" && log "map.txt: сохранена исходная копия"
 	fi
 	if [ -f "$MAPDST" ]; then
 		awk -F'\t' 'NR==FNR { skip[$1]=1; next } !($1 in skip)' "$MAPSRC" "$MAPDST" > /tmp/nx_tools_map.txt 2>> "$LOG"

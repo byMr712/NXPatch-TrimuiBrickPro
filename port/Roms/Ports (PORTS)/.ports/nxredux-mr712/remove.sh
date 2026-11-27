@@ -50,9 +50,9 @@ fi
 
 # названия инструментов: вернуть исходный Tools/map.txt
 MAPDST="$SD/Tools/map.txt"
-if [ -f "$MAPDST.mr712.bak" ]; then
-	if cp "$MAPDST.mr712.bak" "$MAPDST"; then
-		rm -f "$MAPDST.mr712.bak"
+if [ -f "$MAPDST.bak" ]; then
+	if cp "$MAPDST.bak" "$MAPDST"; then
+		rm -f "$MAPDST.bak"
 		sync
 		log "map.txt: исходная копия восстановлена"
 	fi

@@ -75,7 +75,7 @@ The original strings stay in the file, which is why English labels are still vis
 
 ### Tool names
 
-The Tools tab names are not compiled into the binary: NextUI reads them from `Tools/map.txt` on the card. The installer appends rows for the stock paks (`Artwork Manager.pak` → `Менеджер обложек`, etc.), keeping the original file as `map.txt.mr712.bak`; removal restores it (or deletes the file if it did not exist). This works on a clean card and on top of your own renames.
+The Tools tab names are not compiled into the binary: NextUI reads them from `Tools/map.txt` on the card. The installer appends rows for the stock paks (`Artwork Manager.pak` → `Менеджер обложек`, etc.), keeping the original file as `map.txt.bak`; removal restores it (or deletes the file if it did not exist). This works on a clean card and on top of your own renames.
 
 ### In-game menu (`minarch.elf`)
 
