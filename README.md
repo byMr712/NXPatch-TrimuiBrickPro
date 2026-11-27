@@ -12,7 +12,7 @@
 
 | Меню патчера | Главный экран |
 | :---: | :---: |
-| ![Патчер](images/patch-menu.png) | ![Главный экран](images/main-ui.png) |
+| ![Патчер](images/patch-menu.webp) | ![Главный экран](images/main-ui.webp) |
 
 ## Что делает патч
 
@@ -36,11 +36,11 @@
 
 | Главный экран | Менеджер обложек |
 | :---: | :---: |
-| ![Главный экран](images/main-ui.png) | ![Менеджер обложек](images/tools-artwork.png) |
+| ![Главный экран](images/main-ui.webp) | ![Менеджер обложек](images/tools-artwork.webp) |
 
 | Синхронизация | Меню игры |
 | :---: | :---: |
-| ![Синхронизация](images/tools-sync.png) | ![Меню игры](images/game-menu-ru.png) |
+| ![Синхронизация](images/tools-sync.webp) | ![Меню игры](images/game-menu-ru.webp) |
 
 Сетка «Инструментов», «Консолей» и «Коллекций» зациклена: вниз с последней строки ведёт на первую, вверх с первой — на последнюю.
 
@@ -48,33 +48,33 @@
 
 | Клавиатура | Результаты |
 | :---: | :---: |
-| ![Клавиатура поиска](images/search-keyboard.png) | ![Результаты поиска](images/search-results.png) |
+| ![Клавиатура поиска](images/search-keyboard.webp) | ![Результаты поиска](images/search-results.webp) |
 
 ### «Продолжить»
 
-![Строка «Продолжить»](images/continue-row.png)
+![Строка «Продолжить»](images/continue-row.webp)
 
 ### Внутриигровое меню
 
 | Главное меню | Опции |
 | :---: | :---: |
-| ![Внутриигровое меню](images/in-game-menu.png) | ![Опции](images/in-game-options.png) |
+| ![Внутриигровое меню](images/in-game-menu.webp) | ![Опции](images/in-game-options.webp) |
 
 | Оболочка | Сочетания |
 | :---: | :---: |
-| ![Оболочка](images/in-game-frontend.png) | ![Сочетания](images/in-game-shortcuts.png) |
+| ![Оболочка](images/in-game-frontend.webp) | ![Сочетания](images/in-game-shortcuts.webp) |
 
 ### Настройки
 
 | Настройки | Макеты |
 | :---: | :---: |
-| ![Настройки](images/settings-ru.png) | ![Макеты](images/settings-layouts.png) |
+| ![Настройки](images/settings-ru.webp) | ![Макеты](images/settings-layouts.webp) |
 
 ### Логотип и патчер
 
 | Логотип загрузки | Меню патчера |
 | :---: | :---: |
-| ![Логотип](images/bootlogo.png) | ![Патчер](images/patch-menu.png) |
+| ![Логотип](images/bootlogo.webp) | ![Патчер](images/patch-menu.webp) |
 
 ## Совместимость
 

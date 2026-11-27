@@ -83,4 +83,4 @@
 - При запуске с нашей строки nextui пишет `/tmp/resume_slot.txt` = слот игры
   (проверено: `slot=9`), minarch его читает и удаляет — путь resume работает.
 
-![Строка «Продолжить»](../images/continue-row.png)
+![Строка «Продолжить»](../images/continue-row.webp)

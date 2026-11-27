@@ -12,7 +12,7 @@ A patch for **NX Redux on the TrimUI Brick Pro** that translates the interface i
 
 | Patcher menu | Main screen |
 | :---: | :---: |
-| ![Patcher](images/patch-menu.png) | ![Main screen](images/main-ui.png) |
+| ![Patcher](images/patch-menu.webp) | ![Main screen](images/main-ui.webp) |
 
 ## What Does This Patch Do
 
@@ -36,11 +36,11 @@ Every image is a full 1024×768 console screen, not a crop.
 
 | Main screen | Artwork Manager |
 | :---: | :---: |
-| ![Main screen](images/main-ui.png) | ![Artwork Manager](images/tools-artwork.png) |
+| ![Main screen](images/main-ui.webp) | ![Artwork Manager](images/tools-artwork.webp) |
 
 | Device Sync | Game menu |
 | :---: | :---: |
-| ![Device Sync](images/tools-sync.png) | ![Game menu](images/game-menu-ru.png) |
+| ![Device Sync](images/tools-sync.webp) | ![Game menu](images/game-menu-ru.webp) |
 
 The Tools, Consoles and Collections grids wrap: down on the last row goes to the first, up on the first row goes to the last.
 
@@ -48,33 +48,33 @@ The Tools, Consoles and Collections grids wrap: down on the last row goes to the
 
 | Keyboard | Results |
 | :---: | :---: |
-| ![Search keyboard](images/search-keyboard.png) | ![Search results](images/search-results.png) |
+| ![Search keyboard](images/search-keyboard.webp) | ![Search results](images/search-results.webp) |
 
 ### Continue row
 
-![Continue row](images/continue-row.png)
+![Continue row](images/continue-row.webp)
 
 ### In-game menu
 
 | Main menu | Options |
 | :---: | :---: |
-| ![In-game menu](images/in-game-menu.png) | ![Options](images/in-game-options.png) |
+| ![In-game menu](images/in-game-menu.webp) | ![Options](images/in-game-options.webp) |
 
 | Frontend | Shortcuts |
 | :---: | :---: |
-| ![Frontend](images/in-game-frontend.png) | ![Shortcuts](images/in-game-shortcuts.png) |
+| ![Frontend](images/in-game-frontend.webp) | ![Shortcuts](images/in-game-shortcuts.webp) |
 
 ### Settings
 
 | Settings | Layouts |
 | :---: | :---: |
-| ![Settings](images/settings-ru.png) | ![Layouts](images/settings-layouts.png) |
+| ![Settings](images/settings-ru.webp) | ![Layouts](images/settings-layouts.webp) |
 
 ### Boot logo and patcher
 
 | Boot logo | Patcher menu |
 | :---: | :---: |
-| ![Boot logo](images/bootlogo.png) | ![Patcher](images/patch-menu.png) |
+| ![Boot logo](images/bootlogo.webp) | ![Patcher](images/patch-menu.webp) |
 
 ## Compatibility
 

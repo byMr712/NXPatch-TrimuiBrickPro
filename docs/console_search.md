@@ -137,4 +137,4 @@ netplay теперь «ИГРА ПО СЕТИ».
   же выбранной игрой.
 - PID лаунчера не меняется, `dmesg` без `fatal signal`.
 
-![Поиск: bat](../images/console-search.png)
+![Результаты поиска](../images/search-results.webp)
