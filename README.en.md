@@ -22,11 +22,8 @@ A patch for **NX Redux on the TrimUI Brick Pro** that translates the interface i
 - Search within a specific console's game list: in a game list press **MENU** and choose **"Поиск игр по консоли"**.
 - Continue where you left off on each console. The first row in a game list is the game you played last on that console.
 - The Tools list scrolls through the top and bottom edges (wrap-around).
-- The patcher is an **NX Redux Patch** row at the very bottom of **Settings** — start, install and remove from there; the Tools shortcut disappears after the first run.
 
 ## Screenshots
-
-Every image is a full 1024×768 console screen, not a crop.
 
 ### Main screen and tools
 
