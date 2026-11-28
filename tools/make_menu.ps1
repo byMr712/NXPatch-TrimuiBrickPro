@@ -42,6 +42,10 @@ $items = @(
     @('Выйти',           'Вернуться в меню, ничего не меняя')
 )
 
+# Подпись версии считаем ОДИН раз: $Ver и $ver в PowerShell — одна и та же
+# переменная (регистр не важен), и строка копилась бы с каждой итерацией.
+$verLabel = "Версия патча $Ver"
+
 function Wrap($text, $font, $maxW) {
     $words = $text -split ' '
     $lines = @(); $cur = ''
@@ -88,9 +92,8 @@ foreach ($set in @(@('', 'A', 'B'), @('b', 'B', 'A'))) {
         }
 
         $g.DrawString("$conf — ВЫБРАТЬ      $back — НАЗАД", $fFoot, $dim, 60, 706)
-        $ver = "Версия патча $Ver"
-        $vw = $g.MeasureString($ver, $fFoot).Width
-        $g.DrawString($ver, $fFoot, $dim, ($W - 60 - $vw), 706)
+        $vw = $g.MeasureString($verLabel, $fFoot).Width
+        $g.DrawString($verLabel, $fFoot, $dim, ($W - 60 - $vw), 706)
 
         $g.Dispose()
         $out = Join-Path $OutDir "menu${s}${suffix}.bmp"
