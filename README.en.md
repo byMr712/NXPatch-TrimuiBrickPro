@@ -5,7 +5,7 @@
 ![Platform](https://img.shields.io/badge/Platform-TrimUI_Brick_Pro-blue.svg)
 ![NX Redux](https://img.shields.io/badge/NX_Redux-2.5.1-blue.svg)
 ![Interface](https://img.shields.io/badge/Interface-Russian-blue.svg)
-![Patch](https://img.shields.io/badge/Patch-1.0-blue.svg)
+![Patch](https://img.shields.io/badge/Patch-1.1-blue.svg)
 ![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)
 
 A patch for **NX Redux on the TrimUI Brick Pro** that translates the interface into Russian, replaces the boot logo and adds a few menu improvements. The patch is applied on the fly to the already installed `nextui.elf` / `settings.elf` and can be removed just as easily.

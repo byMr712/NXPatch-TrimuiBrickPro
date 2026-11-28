@@ -5,7 +5,7 @@
 ![Platform](https://img.shields.io/badge/Platform-TrimUI_Brick_Pro-blue.svg)
 ![NX Redux](https://img.shields.io/badge/NX_Redux-2.5.1-blue.svg)
 ![Interface](https://img.shields.io/badge/Interface-Russian-blue.svg)
-![Patch](https://img.shields.io/badge/Patch-1.0-blue.svg)
+![Patch](https://img.shields.io/badge/Patch-1.1-blue.svg)
 ![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)
 
 Патч для **NX Redux на TrimUI Brick Pro**, который переводит интерфейс на русский язык, меняет загрузочный логотип и добавляет несколько доработок меню. Патч накладывается «на лету» на уже установленные `nextui.elf` / `settings.elf` и так же просто снимается.
