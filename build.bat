@@ -1,7 +1,7 @@
 @echo off
 rem ============================================================
-rem  NX PATCH v1.0 for TrimUI Brick Pro - сборка архива для карты
-rem  Результат: builds\NXPatch_v1.0_for_Trimui_Brick_Pro.zip
+rem  NX PATCH v1.1 for TrimUI Brick Pro - сборка архива для карты
+rem  Результат: builds\NXPatch_v1.1_for_Trimui_Brick_Pro.zip
 rem
 rem  Внутри архива: NX Redux Patch.pak\ (ярлык), .nxredux\ (сам патчер)
 rem  и Инструкция_Manual.txt; распаковать в папку Tools на карте.
@@ -10,7 +10,7 @@ rem  Запуск двойным щелчком или: build.bat [-y]
 rem    -y  не ждать нажатия клавиши в конце (для скриптов)
 rem ============================================================
 setlocal EnableExtensions
-set "VER=1.0"
+set "VER=1.1"
 set "ROOT=%~dp0"
 set "SRC=%ROOT%port\Tools"
 set "OUT=%ROOT%builds"

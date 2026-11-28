@@ -1720,55 +1720,18 @@ static int patch_shortcut_ref(void) {
     return 0;
 }
 
-static uint64_t button_array_va;
-
-static void build_button_display(void) {
+/* Метки кнопок в меню «Управление» (button_labels[] по адресу 0x4d2150):
+ * переводим только сами строки внутри массива, адрес массива не меняем.
+ * Иначе ломается проверка `item->values == button_labels`: строка перестаёт
+ * считаться привязкой (её начинают листать влево/вправо, и значение не
+ * сохраняется), ломались и «Управление», и «Сочетания». */
+static void patch_button_labels(void) {
     const uint64_t labels = 0x4d2150ULL;
-    int n = 0;
-    while (n < 64) {
-        uint8_t *q = file_ptr(labels + (uint64_t)n * 8, 8);
+    for (int j = 0; j < 64; j++) {
+        uint8_t *q = file_ptr(labels + (uint64_t)j * 8, 8);
         if (!q || !rd64(q)) break;
-        n++;
-    }
-    while (cave_len % 8) cave[cave_len++] = 0;
-    button_array_va = cave_vaddr + cave_len;
-    if (cave_len + (uint64_t)(n + 1) * 8 > max_cave) die("cave overflow");
-    for (int j = 0; j < n; j++) {
-        uint64_t old = rd64(file_ptr(labels + (uint64_t)j * 8, 8));
-        uint64_t ru = find_disp(2, old);
-        wr64(cave + cave_len + (uint64_t)j * 8, ru ? ru : old);
-    }
-    wr64(cave + cave_len + (uint64_t)n * 8, 0);
-    cave_len += (uint64_t)(n + 1) * 8;
-}
-
-/* Redirect every adrp+add to `target` inside [start,start+len) to `new_va`. */
-static void patch_pair_ref(uint64_t start, uint64_t len, uint64_t target, uint64_t new_va) {
-    for (uint64_t off = 0; off + 8 <= len; off += 4) {
-        uint64_t pa = start + off;
-        uint8_t *pp = file_ptr(pa, 4);
-        if (!pp) continue;
-        uint32_t w = rd32(pp);
-        if ((w & 0x9F000000u) != 0x90000000u) continue;
-        uint32_t rd = w & 31;
-        int64_t imm = ((int64_t)((((w >> 5) & 0x7FFFFu) << 2) | ((w >> 29) & 3u)) << 43) >> 31;
-        uint64_t page = (pa & ~0xFFFULL) + (uint64_t)imm;
-        for (int k = 1; k <= 5; k++) {
-            uint64_t aa = pa + (uint64_t)k * 4;
-            uint8_t *ap = file_ptr(aa, 4);
-            if (!ap) break;
-            uint32_t w2 = rd32(ap);
-            if ((w2 & 0xFF000000u) != 0x91000000u) continue;
-            int rn = (int)((w2 >> 5) & 31), rdd = (int)(w2 & 31);
-            if (rn != (int)rd) continue;
-            if (page + (uint64_t)((w2 >> 10) & 0xFFF) != target) continue;
-            int64_t delta = (int64_t)((new_va >> 12) - (pa >> 12));
-            if (delta < -(1 << 20) || delta >= (1 << 20)) return;
-            uint32_t immlo = (uint32_t)(delta & 3), immhi = (uint32_t)((delta >> 2) & 0x7FFFF);
-            wr32(pp, 0x90000000u | (immlo << 29) | (immhi << 5) | rd);
-            wr32(ap, 0x91000000u | ((uint32_t)(new_va & 0xFFF) << 10) | ((uint32_t)rn << 5) | (uint32_t)rdd);
-            return;
-        }
+        uint64_t ru = find_disp(2, rd64(q));
+        if (ru) wr64(q, ru);
     }
 }
 
@@ -1776,7 +1739,7 @@ static int minarch_display(void) {
     if (!dispnum) return 0;
     for (int i = 0; i < dispnum; i++) disp[i].ru_va = cave_add(disp[i].ru);
     build_shortcut_display();
-    build_button_display();
+    patch_button_labels();
     uint8_t *cfgp = file_ptr(0x4d00d0ULL, 312);
     if (!cfgp) return 0;
     uint32_t fcnt = rd32(cfgp + 40);
@@ -1790,8 +1753,6 @@ static int minarch_display(void) {
         if (!k || strcmp((char *)k, "minarch_screen_scaling")) return 0;
     }
     patch_shortcut_ref();
-    patch_pair_ref(0x4688d0ULL, 192, 0x4d2150ULL, button_array_va);
-    patch_pair_ref(0x468990ULL, 380, 0x4d2150ULL, button_array_va);
     display_opts(fopts, (int)fcnt);
     display_opts(sopts, (int)scnt);
     uint64_t scptr = rd64(cfgp + 288);
